@@ -4,7 +4,7 @@ import { ArrowRight, Calendar, Clock, ShieldCheck } from 'lucide-react';
 
 const LandingPage = () => {
     return (
-        <div className="min-h-screen bg-background text-white overflow-hidden relative">
+        <div className="min-h-screen bg-[#0f172a] text-white overflow-hidden relative">
             {/* Background Gradients */}
             <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
                 <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-primary/20 rounded-full blur-[120px]" />
