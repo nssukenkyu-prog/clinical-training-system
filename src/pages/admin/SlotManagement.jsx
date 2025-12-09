@@ -51,9 +51,31 @@ export default function SlotManagement() {
             const reservationsSnapshot = await getDocs(qReservations);
             const reservationsData = reservationsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-            // 3. Merge
+            // 3. Fetch Student names for reservations
+            const studentIds = [...new Set(reservationsData.map(r => r.student_id))];
+            let studentsMap = {};
+            if (studentIds.length > 0) {
+                const studentsRef = collection(db, 'students');
+                // Chunk for 'in' query (max 10)
+                for (let i = 0; i < studentIds.length; i += 10) {
+                    const chunk = studentIds.slice(i, i + 10);
+                    const qStudents = query(studentsRef, where('__name__', 'in', chunk));
+                    const studentsSnapshot = await getDocs(qStudents);
+                    studentsSnapshot.forEach(doc => {
+                        studentsMap[doc.id] = doc.data();
+                    });
+                }
+            }
+
+            // 4. Merge reservations with student names
+            const reservationsWithNames = reservationsData.map(r => ({
+                ...r,
+                student_name: studentsMap[r.student_id]?.name || '不明'
+            }));
+
+            // 5. Merge into slots
             const slotsWithReservations = slotsData.map(slot => {
-                const slotReservations = reservationsData.filter(r => r.slot_id === slot.id);
+                const slotReservations = reservationsWithNames.filter(r => r.slot_id === slot.id);
                 return {
                     ...slot,
                     reservations: slotReservations
@@ -69,7 +91,6 @@ export default function SlotManagement() {
             setSlots(slotsWithReservations);
         } catch (error) {
             console.error("Error loading slots:", error);
-            // alert('データの読み込みに失敗しました'); // Don't block UI on load error
         } finally {
             setLoading(false);
         }
@@ -330,6 +351,23 @@ export default function SlotManagement() {
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
                                         </div>
+
+                                        {/* 予約者リスト */}
+                                        {confirmed > 0 && (
+                                            <div className="mt-3 pt-3 border-t border-slate-100">
+                                                <p className="text-xs text-slate-500 mb-2 font-medium">予約者:</p>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {(slot.reservations || []).map(r => (
+                                                        <span
+                                                            key={r.id}
+                                                            className="text-xs px-2 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100"
+                                                        >
+                                                            {r.student_name}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}

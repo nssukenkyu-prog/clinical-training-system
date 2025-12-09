@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { auth, db } from '../../lib/firebase';
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, getDoc } from 'firebase/firestore';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, AlertCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, AlertCircle, X } from 'lucide-react';
 import { clsx } from 'clsx';
 
 export default function SlotReservation() {
@@ -13,6 +13,10 @@ export default function SlotReservation() {
     const [loading, setLoading] = useState(true);
     const [reserving, setReserving] = useState(false);
     const [settings, setSettings] = useState(null);
+    const [showTimeModal, setShowTimeModal] = useState(false);
+    const [selectedSlot, setSelectedSlot] = useState(null);
+    const [customStartTime, setCustomStartTime] = useState('');
+    const [customEndTime, setCustomEndTime] = useState('');
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -151,7 +155,7 @@ export default function SlotReservation() {
         );
     };
 
-    const handleReserve = async (slot) => {
+    const handleReserve = (slot) => {
         if (!student || reserving) return;
 
         const availability = getAvailability(slot);
@@ -165,7 +169,50 @@ export default function SlotReservation() {
             return;
         }
 
-        if (!window.confirm(`${slot.date} ${slot.start_time.slice(0, 5)}〜${slot.end_time.slice(0, 5)} を予約しますか？`)) {
+        // モーダルを開いて時間を選択させる
+        setSelectedSlot(slot);
+        setCustomStartTime(slot.start_time.slice(0, 5));
+        setCustomEndTime(slot.end_time.slice(0, 5));
+        setShowTimeModal(true);
+    };
+
+    const timeToMinutes = (time) => {
+        const [h, m] = time.split(':').map(Number);
+        return h * 60 + m;
+    };
+
+    const confirmReservation = async () => {
+        if (!selectedSlot || !student || reserving) return;
+
+        const slot = selectedSlot;
+
+        // バリデーション
+        const slotStartMins = timeToMinutes(slot.start_time.slice(0, 5));
+        const slotEndMins = timeToMinutes(slot.end_time.slice(0, 5));
+        const customStartMins = timeToMinutes(customStartTime);
+        const customEndMins = timeToMinutes(customEndTime);
+        const duration = customEndMins - customStartMins;
+
+        const minMinutes = settings?.minDailyMinutes || 120;
+        const maxMinutes = settings?.maxDailyMinutes || 480;
+
+        if (customStartMins < slotStartMins || customEndMins > slotEndMins) {
+            alert(`時間は枠の範囲内 (${slot.start_time.slice(0, 5)} 〜 ${slot.end_time.slice(0, 5)}) で入力してください。`);
+            return;
+        }
+
+        if (customStartMins >= customEndMins) {
+            alert('終了時間は開始時間より後にしてください。');
+            return;
+        }
+
+        if (duration < minMinutes) {
+            alert(`最低 ${Math.floor(minMinutes / 60)}時間${minMinutes % 60}分 以上で予約してください。`);
+            return;
+        }
+
+        if (duration > maxMinutes) {
+            alert(`1日の最高時間 ${Math.floor(maxMinutes / 60)}時間${maxMinutes % 60}分 を超えています。`);
             return;
         }
 
@@ -181,7 +228,11 @@ export default function SlotReservation() {
                 slot_date: slot.date,
                 slot_start_time: slot.start_time,
                 slot_end_time: slot.end_time,
-                slot_training_type: slot.training_type
+                slot_training_type: slot.training_type,
+                // カスタム時間
+                custom_start_time: customStartTime,
+                custom_end_time: customEndTime,
+                custom_duration_minutes: duration
             };
 
             await addDoc(collection(db, 'reservations'), reservationData);
@@ -198,7 +249,7 @@ export default function SlotReservation() {
                             <p>${student.name} 様</p>
                             <p>以下の日程で予約を受け付けました。</p>
                             <ul>
-                                <li>日時: ${slot.date} ${slot.start_time.slice(0, 5)} - ${slot.end_time.slice(0, 5)}</li>
+                                <li>日時: ${slot.date} ${customStartTime} - ${customEndTime}</li>
                                 <li>実習: ${slot.training_type}</li>
                             </ul>
                             <p>キャンセルはシステムから行ってください。</p>
@@ -210,6 +261,8 @@ export default function SlotReservation() {
             }
 
             alert('予約が完了しました');
+            setShowTimeModal(false);
+            setSelectedSlot(null);
             loadSlots(); // Reload
 
         } catch (error) {
@@ -453,6 +506,70 @@ export default function SlotReservation() {
                     )}
                 </div>
             </div>
+
+            {/* Time Selection Modal */}
+            {showTimeModal && selectedSlot && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setShowTimeModal(false)}>
+                    <div className="glass-panel p-6 rounded-2xl w-full max-w-md bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-xl font-bold text-slate-900">実習時間を選択</h3>
+                            <button onClick={() => setShowTimeModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <div className="mb-4 p-3 rounded-lg bg-blue-50 border border-blue-100 text-blue-700 text-sm">
+                            <p className="font-medium mb-1">枠の時間範囲</p>
+                            <p className="text-blue-600">{selectedSlot.start_time.slice(0, 5)} 〜 {selectedSlot.end_time.slice(0, 5)}</p>
+                        </div>
+
+                        <div className="space-y-4 mb-6">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">開始時間</label>
+                                <input
+                                    type="time"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 focus:outline-none focus:border-primary text-slate-900 transition-colors text-lg"
+                                    value={customStartTime}
+                                    onChange={(e) => setCustomStartTime(e.target.value)}
+                                    min={selectedSlot.start_time.slice(0, 5)}
+                                    max={selectedSlot.end_time.slice(0, 5)}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">終了時間</label>
+                                <input
+                                    type="time"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 focus:outline-none focus:border-primary text-slate-900 transition-colors text-lg"
+                                    value={customEndTime}
+                                    onChange={(e) => setCustomEndTime(e.target.value)}
+                                    min={selectedSlot.start_time.slice(0, 5)}
+                                    max={selectedSlot.end_time.slice(0, 5)}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="mb-6 p-3 rounded-lg bg-amber-50 border border-amber-100 text-amber-700 text-sm">
+                            <p>最低 {Math.floor((settings?.minDailyMinutes || 120) / 60)}時間{(settings?.minDailyMinutes || 120) % 60 > 0 ? `${(settings?.minDailyMinutes || 120) % 60}分` : ''} 〜 最高 {Math.floor((settings?.maxDailyMinutes || 480) / 60)}時間{(settings?.maxDailyMinutes || 480) % 60 > 0 ? `${(settings?.maxDailyMinutes || 480) % 60}分` : ''}</p>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowTimeModal(false)}
+                                className="flex-1 px-4 py-3 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition-colors"
+                            >
+                                キャンセル
+                            </button>
+                            <button
+                                onClick={confirmReservation}
+                                disabled={reserving}
+                                className="flex-1 px-4 py-3 rounded-xl bg-primary text-white font-bold hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 disabled:opacity-50"
+                            >
+                                {reserving ? '処理中...' : '予約を確定'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
