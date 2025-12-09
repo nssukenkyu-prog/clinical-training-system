@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { auth, db } from '../../lib/firebase';
-import { collection, query, where, getDocs, addDoc, updateDoc, doc, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, updateDoc, doc } from 'firebase/firestore';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, AlertCircle } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -86,7 +86,6 @@ export default function SlotReservation() {
         const slotsData = slotsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
         // 2. Fetch Reservations for this month (to calculate availability)
-        // We query reservations that have slot_date within the range
         const reservationsRef = collection(db, 'reservations');
         const qReservations = query(
             reservationsRef,
@@ -106,7 +105,7 @@ export default function SlotReservation() {
             };
         });
 
-        // Sort manually since we can't sort by multiple fields easily with inequality filter in Firestore without index
+        // Sort
         slotsWithReservations.sort((a, b) => {
             if (a.date !== b.date) return a.date.localeCompare(b.date);
             return a.start_time.localeCompare(b.start_time);
@@ -143,9 +142,9 @@ export default function SlotReservation() {
         const confirmed = (slot.reservations || []).length;
         const remaining = slot.max_capacity - confirmed;
 
-        if (remaining <= 0) return { status: 'none', label: '満員', remaining: 0, color: 'text-rose-400' };
-        if (remaining <= 2) return { status: 'few', label: '残りわずか', remaining, color: 'text-amber-400' };
-        return { status: 'available', label: '空きあり', remaining, color: 'text-emerald-400' };
+        if (remaining <= 0) return { status: 'none', label: '満員', remaining: 0, color: 'text-rose-500 bg-rose-50 border-rose-100' };
+        if (remaining <= 2) return { status: 'few', label: '残りわずか', remaining, color: 'text-amber-600 bg-amber-50 border-amber-100' };
+        return { status: 'available', label: '空きあり', remaining, color: 'text-emerald-600 bg-emerald-50 border-emerald-100' };
     };
 
     const isAlreadyReserved = (slot) => {
@@ -187,18 +186,33 @@ export default function SlotReservation() {
                 slot_training_type: slot.training_type
             };
 
-            const docRef = await addDoc(collection(db, 'reservations'), reservationData);
+            await addDoc(collection(db, 'reservations'), reservationData);
 
-            // Send confirmation email (Placeholder for Cloudflare Worker)
+            // Send confirmation email via Cloudflare Worker
             try {
-                // await fetch('/api/send-email', { ... });
-                console.log('Email sending logic to be implemented with Cloudflare Worker');
+                await fetch('/api/send-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        to: student.email,
+                        subject: '【臨床実習】予約完了のお知らせ',
+                        body: `
+                            <p>${student.name} 様</p>
+                            <p>以下の日程で予約を受け付けました。</p>
+                            <ul>
+                                <li>日時: ${slot.date} ${slot.start_time.slice(0, 5)} - ${slot.end_time.slice(0, 5)}</li>
+                                <li>実習: ${slot.training_type}</li>
+                            </ul>
+                            <p>キャンセルはシステムから行ってください。</p>
+                        `
+                    })
+                });
             } catch (emailError) {
                 console.error('Failed to send email:', emailError);
             }
 
             alert('予約が完了しました');
-            loadSlots(); // リロード
+            loadSlots(); // Reload
 
         } catch (error) {
             console.error(error);
@@ -215,7 +229,7 @@ export default function SlotReservation() {
 
         if (!reservation) return;
 
-        // 12時間前チェック
+        // 12 hours check
         const slotDateTime = new Date(`${slot.date}T${slot.start_time}`);
         const now = new Date();
         const hoursUntilSlot = (slotDateTime - now) / (1000 * 60 * 60);
@@ -249,8 +263,8 @@ export default function SlotReservation() {
                             <p>${student.name} 様</p>
                             <p>以下の予約をキャンセルしました。</p>
                             <ul>
-                                <li>日時: ${reservation.slot_date} ${reservation.slot_start_time} - ${reservation.slot_end_time}</li>
-                                <li>実習: ${reservation.slot_training_type}</li>
+                                <li>日時: ${slot.date} ${slot.start_time.slice(0, 5)} - ${slot.end_time.slice(0, 5)}</li>
+                                <li>実習: ${slot.training_type}</li>
                             </ul>
                         `
                     })
@@ -287,7 +301,7 @@ export default function SlotReservation() {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-8 h-8 border-2 border-primary border-t-white/0 rounded-full animate-spin"></div>
             </div>
         );
     }
@@ -298,32 +312,32 @@ export default function SlotReservation() {
         <div className="space-y-8">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold">実習予約</h1>
-                    <p className="text-slate-400 mt-1">希望する日時を選択してください</p>
+                    <h1 className="text-3xl font-bold text-slate-900">実習予約</h1>
+                    <p className="text-slate-500 mt-1">希望する日時を選択してください</p>
                 </div>
-                <Link to="/student/dashboard" className="text-sm text-slate-400 hover:text-white transition-colors">
-                    ダッシュボードに戻る
+                <Link to="/student/dashboard" className="text-sm text-slate-500 hover:text-primary transition-colors font-medium">
+                    ← ダッシュボードに戻る
                 </Link>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Calendar */}
-                <div className="lg:col-span-2 glass-panel p-6 rounded-2xl">
+                <div className="lg:col-span-2 glass-panel p-6 rounded-2xl bg-white shadow-lg border-slate-100">
                     <div className="flex items-center justify-between mb-6">
-                        <button onClick={prevMonth} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+                        <button onClick={prevMonth} className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-600">
                             <ChevronLeft className="w-5 h-5" />
                         </button>
-                        <h2 className="text-xl font-bold">
+                        <h2 className="text-xl font-bold text-slate-900">
                             {currentMonth.getFullYear()}年 {currentMonth.getMonth() + 1}月
                         </h2>
-                        <button onClick={nextMonth} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+                        <button onClick={nextMonth} className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-600">
                             <ChevronRight className="w-5 h-5" />
                         </button>
                     </div>
 
                     <div className="grid grid-cols-7 gap-2 mb-2">
                         {['日', '月', '火', '水', '木', '金', '土'].map(day => (
-                            <div key={day} className="text-center text-sm text-slate-400 py-2">
+                            <div key={day} className="text-center text-sm text-slate-500 py-2 font-medium">
                                 {day}
                             </div>
                         ))}
@@ -346,46 +360,48 @@ export default function SlotReservation() {
                                     onClick={() => !isPast && hasSlots && setSelectedDate(date)}
                                     disabled={isPast || !hasSlots}
                                     className={clsx(
-                                        "aspect-square rounded-xl flex flex-col items-center justify-center relative transition-all",
-                                        isSelected ? "bg-primary text-white shadow-lg shadow-primary/30 scale-105" :
-                                            hasSlots ? "bg-white/5 hover:bg-white/10 text-white cursor-pointer border border-white/5" :
-                                                "bg-transparent text-slate-600 cursor-default"
+                                        "aspect-square rounded-xl flex flex-col items-center justify-center relative transition-all border",
+                                        isSelected ? "bg-primary text-white shadow-md border-primary scale-105" :
+                                            hasSlots ? "bg-blue-50 hover:bg-blue-100 text-slate-700 cursor-pointer border-blue-100" :
+                                                "bg-white text-slate-300 border-slate-100 cursor-default"
                                     )}
                                 >
                                     <span className="text-lg font-medium">{date.getDate()}</span>
                                     {hasSlots && !isSelected && (
-                                        <span className="w-1.5 h-1.5 rounded-full bg-accent mt-1"></span>
+                                        <span className="text-[10px] text-blue-600 mt-1 font-bold">
+                                            {dateSlots.length}枠
+                                        </span>
                                     )}
                                 </button>
                             );
                         })}
                     </div>
 
-                    <div className="mt-6 flex items-center gap-4 text-sm text-slate-400">
+                    <div className="mt-6 flex items-center gap-4 text-sm text-slate-500">
                         <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-accent"></span>
-                            <span>実習枠あり</span>
+                            <span className="w-3 h-3 rounded-full bg-blue-100 border border-blue-200"></span>
+                            <span>予約受付中</span>
                         </div>
                         <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-slate-600"></span>
+                            <span className="w-3 h-3 rounded-full bg-slate-100 border border-slate-200"></span>
                             <span>枠なし/過去</span>
                         </div>
                     </div>
                 </div>
 
                 {/* Slots List */}
-                <div className="glass-panel p-6 rounded-2xl h-fit">
-                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                <div className="glass-panel p-6 rounded-2xl h-fit bg-white shadow-lg border-slate-100">
+                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-slate-900">
                         <CalendarIcon className="w-5 h-5 text-primary" />
                         {selectedDate ? formatDate(selectedDate) : '日付を選択'}
                     </h3>
 
                     {!selectedDate ? (
-                        <div className="text-center py-12 text-slate-500">
+                        <div className="text-center py-12 text-slate-400 bg-slate-50 rounded-xl border border-slate-100 dashed">
                             <p>カレンダーから日付を<br />選択してください</p>
                         </div>
                     ) : selectedDateSlots.length === 0 ? (
-                        <div className="text-center py-12 text-slate-500">
+                        <div className="text-center py-12 text-slate-400 bg-slate-50 rounded-xl border border-slate-100 dashed">
                             <p>この日の実習枠はありません</p>
                         </div>
                     ) : (
@@ -395,26 +411,26 @@ export default function SlotReservation() {
                                 const reserved = isAlreadyReserved(slot);
 
                                 return (
-                                    <div key={slot.id} className="p-4 rounded-xl bg-white/5 border border-white/10">
+                                    <div key={slot.id} className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm">
                                         <div className="flex items-center justify-between mb-3">
-                                            <div className="flex items-center gap-2 text-lg font-bold">
+                                            <div className="flex items-center gap-2 text-lg font-bold text-slate-700">
                                                 <Clock className="w-4 h-4 text-slate-400" />
                                                 {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
                                             </div>
-                                            <span className={clsx("text-sm font-medium", availability.color)}>
+                                            <span className={clsx("text-xs font-bold px-2 py-1 rounded border", availability.color)}>
                                                 {availability.label}
                                             </span>
                                         </div>
 
                                         <div className="flex items-center justify-between">
-                                            <span className="text-sm text-slate-400">
+                                            <span className="text-sm text-slate-500">
                                                 残り {availability.remaining} 枠
                                             </span>
 
                                             {reserved ? (
                                                 <button
                                                     onClick={() => handleCancelReservation(slot)}
-                                                    className="px-4 py-2 rounded-lg bg-rose-500/20 text-rose-300 text-sm font-medium hover:bg-rose-500/30 transition-colors"
+                                                    className="px-4 py-2 rounded-lg bg-rose-50 text-rose-600 text-sm font-bold border border-rose-100 hover:bg-rose-100 transition-colors"
                                                 >
                                                     キャンセル
                                                 </button>
@@ -422,12 +438,12 @@ export default function SlotReservation() {
                                                 <button
                                                     onClick={() => handleReserve(slot)}
                                                     disabled={reserving}
-                                                    className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
+                                                    className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-colors shadow-md shadow-primary/20"
                                                 >
                                                     {reserving ? '処理中...' : '予約する'}
                                                 </button>
                                             ) : (
-                                                <span className="px-4 py-2 rounded-lg bg-slate-700 text-slate-400 text-sm font-medium">
+                                                <span className="px-4 py-2 rounded-lg bg-slate-100 text-slate-400 text-sm font-bold border border-slate-200">
                                                     満員
                                                 </span>
                                             )}
