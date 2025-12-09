@@ -1,0 +1,264 @@
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { auth, db } from '../../lib/firebase';
+import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { Clock, Calendar, CheckCircle, AlertCircle, Plus } from 'lucide-react';
+import { clsx } from 'clsx';
+
+export default function StudentDashboard() {
+    const [student, setStudent] = useState(null);
+    const [reservations, setReservations] = useState([]);
+    const [totalMinutes, setTotalMinutes] = useState(0);
+    const [settings, setSettings] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        loadData();
+    }, []);
+
+    const loadData = async () => {
+        try {
+            const user = auth.currentUser;
+            if (!user) return;
+
+            // 学生情報を取得
+            const studentsRef = collection(db, 'students');
+            // Try to find student by auth_user_id (uid) or email
+            // Ideally we use uid.
+            const qStudent = query(studentsRef, where('auth_user_id', '==', user.uid));
+            let studentSnapshot = await getDocs(qStudent);
+
+            // Fallback to email if not found (for migration safety)
+            if (studentSnapshot.empty && user.email) {
+                const qStudentEmail = query(studentsRef, where('email', '==', user.email));
+                studentSnapshot = await getDocs(qStudentEmail);
+            }
+
+            if (!studentSnapshot.empty) {
+                const studentDoc = studentSnapshot.docs[0];
+                const studentData = { id: studentDoc.id, ...studentDoc.data() };
+                setStudent(studentData);
+
+                // 予約一覧を取得
+                const reservationsRef = collection(db, 'reservations');
+                const qReservations = query(
+                    reservationsRef,
+                    where('student_id', '==', studentData.id),
+                    orderBy('created_at', 'desc')
+                );
+                const reservationsSnapshot = await getDocs(qReservations);
+
+                const reservationsData = reservationsSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+
+                setReservations(reservationsData);
+
+                // 累積時間を計算
+                const completed = reservationsData.filter(r => r.status === 'completed');
+                const total = completed.reduce((sum, r) => sum + (r.actual_minutes || 0), 0);
+                setTotalMinutes(total);
+            }
+
+            // システム設定を取得
+            const settingsRef = collection(db, 'settings');
+            const qSettings = query(settingsRef, where('key', '==', 'training_config'));
+            const settingsSnapshot = await getDocs(qSettings);
+
+            if (!settingsSnapshot.empty) {
+                setSettings(settingsSnapshot.docs[0].data().value);
+            }
+
+        } catch (error) {
+            console.error('Error loading data:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const formatTime = (minutes) => {
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        return `${hours}時間${mins}分`;
+    };
+
+    const getProgressPercent = () => {
+        if (!settings) return 0;
+        return Math.min((totalMinutes / settings.requiredMinutes) * 100, 100);
+    };
+
+    const getTrainingTypeLabel = (type) => {
+        const labels = { 'I': '臨床実習Ⅰ', 'II': '臨床実習Ⅱ', 'IV': '臨床実習Ⅳ' };
+        return labels[type] || type;
+    };
+
+    const getStatusBadge = (status) => {
+        const styles = {
+            'confirmed': 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+            'completed': 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+            'cancelled': 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+        };
+        const labels = {
+            'confirmed': '予約済',
+            'completed': '完了',
+            'cancelled': 'キャンセル'
+        };
+        return (
+            <span className={clsx("px-2 py-1 rounded-full text-xs font-medium border", styles[status])}>
+                {labels[status] || status}
+            </span>
+        );
+    };
+
+    const formatDate = (dateStr) => {
+        if (!dateStr) return '';
+        const date = new Date(dateStr);
+        const days = ['日', '月', '火', '水', '木', '金', '土'];
+        return `${date.getMonth() + 1}月${date.getDate()}日(${days[date.getDay()]})`;
+    };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-8">
+            {/* Header Section */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold">Dashboard</h1>
+                    <p className="text-slate-400 mt-1">実習の進捗状況と予約管理</p>
+                </div>
+                <Link
+                    to="/student/reservation"
+                    className="glass-button px-6 py-3 rounded-xl flex items-center gap-2 text-primary font-bold hover:bg-primary/20"
+                >
+                    <Plus className="w-5 h-5" />
+                    新規予約
+                </Link>
+            </div>
+
+            {/* Progress Card */}
+            <div className="glass-panel p-8 rounded-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 opacity-10">
+                    <Clock className="w-32 h-32" />
+                </div>
+
+                <div className="relative z-10">
+                    <div className="flex items-center justify-between mb-6">
+                        <h2 className="text-xl font-bold flex items-center gap-2">
+                            <CheckCircle className="w-5 h-5 text-primary" />
+                            実習進捗状況
+                        </h2>
+                        <span className="px-3 py-1 rounded-full bg-white/10 text-sm font-medium">
+                            {getTrainingTypeLabel(student?.training_type)}
+                        </span>
+                    </div>
+
+                    <div className="mb-4">
+                        <div className="flex justify-between text-sm mb-2">
+                            <span className="text-slate-400">達成率</span>
+                            <span className="font-bold text-xl">{Math.round(getProgressPercent())}%</span>
+                        </div>
+                        <div className="h-4 bg-slate-700 rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-1000 ease-out"
+                                style={{ width: `${getProgressPercent()}%` }}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 mt-6">
+                        <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                            <p className="text-sm text-slate-400 mb-1">現在の累積時間</p>
+                            <p className="text-2xl font-bold text-white">{formatTime(totalMinutes)}</p>
+                        </div>
+                        <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                            <p className="text-sm text-slate-400 mb-1">目標時間</p>
+                            <p className="text-2xl font-bold text-slate-300">{formatTime(settings?.requiredMinutes || 1260)}</p>
+                        </div>
+                    </div>
+
+                    {getProgressPercent() >= 100 && (
+                        <div className="mt-6 p-4 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-200 flex items-center gap-3">
+                            <CheckCircle className="w-5 h-5" />
+                            <p>目標達成！必要な実習時間をクリアしました。</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Reservations List */}
+            <div className="glass-panel p-8 rounded-2xl">
+                <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-primary" />
+                    予約一覧
+                </h2>
+
+                {reservations.length === 0 ? (
+                    <div className="text-center py-12 text-slate-400">
+                        <p>予約がありません</p>
+                        <Link to="/student/reservation" className="text-primary hover:underline mt-2 inline-block">
+                            実習枠を予約する
+                        </Link>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
+                            <thead>
+                                <tr className="text-left text-slate-400 border-b border-white/10">
+                                    <th className="pb-4 pl-4 font-medium">日付</th>
+                                    <th className="pb-4 font-medium">時間</th>
+                                    <th className="pb-4 font-medium">実習区分</th>
+                                    <th className="pb-4 font-medium">ステータス</th>
+                                    <th className="pb-4 font-medium">実習時間</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                                {reservations.map((reservation) => (
+                                    <tr key={reservation.id} className="hover:bg-white/5 transition-colors">
+                                        <td className="py-4 pl-4">
+                                            {formatDate(reservation.slot_date)}
+                                        </td>
+                                        <td className="py-4">
+                                            {reservation.slot_start_time && `${reservation.slot_start_time.slice(0, 5)} - ${reservation.slot_end_time.slice(0, 5)}`}
+                                        </td>
+                                        <td className="py-4">
+                                            {getTrainingTypeLabel(reservation.slot_training_type)}
+                                        </td>
+                                        <td className="py-4">
+                                            {getStatusBadge(reservation.status)}
+                                        </td>
+                                        <td className="py-4 font-mono">
+                                            {reservation.actual_minutes
+                                                ? formatTime(reservation.actual_minutes)
+                                                : '-'}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+
+            {/* Notice */}
+            <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-200 flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                <div>
+                    <strong className="block mb-1">予約の変更・キャンセルについて</strong>
+                    <p className="text-sm opacity-90">
+                        予約の変更・キャンセルは開始時刻の12時間前まで可能です。
+                        それ以降の変更は、Teamsでご連絡ください。
+                    </p>
+                </div>
+            </div>
+        </div>
+    );
+}

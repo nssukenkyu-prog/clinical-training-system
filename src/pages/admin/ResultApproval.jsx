@@ -1,0 +1,285 @@
+import { useState, useEffect } from 'react';
+import { db } from '../../lib/firebase';
+import { collection, query, where, getDocs, updateDoc, doc, orderBy, documentId } from 'firebase/firestore';
+import { CheckSquare, Search, Check, X, Clock } from 'lucide-react';
+import { clsx } from 'clsx';
+
+export default function ResultApproval() {
+    const [reservations, setReservations] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [filter, setFilter] = useState('pending'); // pending, completed
+    const [processingId, setProcessingId] = useState(null);
+
+    useEffect(() => {
+        loadReservations();
+    }, [filter]);
+
+    const loadReservations = async () => {
+        setLoading(true);
+        try {
+            const reservationsRef = collection(db, 'reservations');
+            let q;
+
+            if (filter === 'pending') {
+                q = query(reservationsRef, where('status', '==', 'confirmed'), orderBy('created_at', 'desc'));
+            } else {
+                q = query(reservationsRef, where('status', '==', 'completed'), orderBy('created_at', 'desc'));
+            }
+
+            const querySnapshot = await getDocs(q);
+            const reservationsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+            if (reservationsData.length === 0) {
+                setReservations([]);
+                setLoading(false);
+                return;
+            }
+
+            // Fetch related students
+            // Get unique student IDs
+            const studentIds = [...new Set(reservationsData.map(r => r.student_id))];
+
+            // Firestore 'in' query is limited to 10 items. We need to chunk if more.
+            // For simplicity in this migration, if there are many, we might need a different approach.
+            // But let's assume < 10 active students for now or implement chunking.
+
+            let studentsMap = {};
+
+            // Chunking for 'in' query
+            const chunkSize = 10;
+            for (let i = 0; i < studentIds.length; i += chunkSize) {
+                const chunk = studentIds.slice(i, i + chunkSize);
+                if (chunk.length > 0) {
+                    const studentsRef = collection(db, 'students');
+                    const qStudents = query(studentsRef, where(documentId(), 'in', chunk));
+                    const studentsSnapshot = await getDocs(qStudents);
+                    studentsSnapshot.forEach(doc => {
+                        studentsMap[doc.id] = doc.data();
+                    });
+                }
+            }
+
+            // Merge data
+            // Note: Slot data is already denormalized in reservation (slot_date, slot_start_time, etc.)
+            const mergedReservations = reservationsData.map(r => ({
+                ...r,
+                student: studentsMap[r.student_id] || { name: 'Unknown', student_number: '???', grade: '?', training_type: '?' },
+                slot: {
+                    date: r.slot_date,
+                    start_time: r.slot_start_time,
+                    end_time: r.slot_end_time,
+                    training_type: r.slot_training_type
+                }
+            }));
+
+            setReservations(mergedReservations);
+
+        } catch (error) {
+            console.error('Error loading reservations:', error);
+            alert('データの読み込みに失敗しました');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const calculateDuration = (start, end) => {
+        if (!start || !end) return 0;
+        const [startH, startM] = start.split(':').map(Number);
+        const [endH, endM] = end.split(':').map(Number);
+        return (endH * 60 + endM) - (startH * 60 + startM);
+    };
+
+    const handleApprove = async (reservation, actualMinutes) => {
+        if (!window.confirm(`${reservation.student.name}さんの実習を完了として承認しますか？\n実績時間: ${Math.floor(actualMinutes / 60)}時間${actualMinutes % 60}分`)) {
+            return;
+        }
+
+        setProcessingId(reservation.id);
+        try {
+            const reservationRef = doc(db, 'reservations', reservation.id);
+            await updateDoc(reservationRef, {
+                status: 'completed',
+                actual_minutes: actualMinutes
+            });
+
+            // Remove from list if pending filter
+            if (filter === 'pending') {
+                setReservations(reservations.filter(r => r.id !== reservation.id));
+            } else {
+                loadReservations();
+            }
+
+            // Optional: Show success toast
+        } catch (error) {
+            console.error('Error approving:', error);
+            alert('承認処理に失敗しました');
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+    const handleCancel = async (reservation) => {
+        if (!window.confirm(`${reservation.student.name}さんの予約をキャンセル扱いにしますか？`)) {
+            return;
+        }
+
+        setProcessingId(reservation.id);
+        try {
+            const reservationRef = doc(db, 'reservations', reservation.id);
+            await updateDoc(reservationRef, {
+                status: 'cancelled',
+                cancelled_at: new Date().toISOString()
+            });
+
+            setReservations(reservations.filter(r => r.id !== reservation.id));
+        } catch (error) {
+            console.error('Error cancelling:', error);
+            alert('キャンセル処理に失敗しました');
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+    const formatDate = (dateStr) => {
+        if (!dateStr) return '';
+        const date = new Date(dateStr);
+        const days = ['日', '月', '火', '水', '木', '金', '土'];
+        return `${date.getMonth() + 1}月${date.getDate()}日(${days[date.getDay()]})`;
+    };
+
+    return (
+        <div className="space-y-8">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold">実績承認</h1>
+                    <p className="text-slate-400 mt-1">実習の実績時間を確定・承認します</p>
+                </div>
+
+                <div className="flex bg-white/5 p-1 rounded-lg border border-white/10">
+                    <button
+                        onClick={() => setFilter('pending')}
+                        className={clsx(
+                            "px-4 py-2 rounded-md text-sm font-medium transition-colors",
+                            filter === 'pending' ? "bg-primary text-white" : "text-slate-400 hover:text-white"
+                        )}
+                    >
+                        未承認
+                    </button>
+                    <button
+                        onClick={() => setFilter('completed')}
+                        className={clsx(
+                            "px-4 py-2 rounded-md text-sm font-medium transition-colors",
+                            filter === 'completed' ? "bg-primary text-white" : "text-slate-400 hover:text-white"
+                        )}
+                    >
+                        承認済
+                    </button>
+                </div>
+            </div>
+
+            {loading ? (
+                <div className="flex items-center justify-center h-64">
+                    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                </div>
+            ) : reservations.length === 0 ? (
+                <div className="glass-panel p-12 rounded-2xl text-center text-slate-400">
+                    <CheckSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>対象のデータはありません</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 gap-4">
+                    {reservations.map((reservation) => {
+                        const defaultDuration = calculateDuration(reservation.slot.start_time, reservation.slot.end_time);
+
+                        return (
+                            <ResultCard
+                                key={reservation.id}
+                                reservation={reservation}
+                                defaultDuration={defaultDuration}
+                                onApprove={handleApprove}
+                                onCancel={handleCancel}
+                                isProcessing={processingId === reservation.id}
+                                isCompleted={filter === 'completed'}
+                            />
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+}
+
+const ResultCard = ({ reservation, defaultDuration, onApprove, onCancel, isProcessing, isCompleted }) => {
+    const [minutes, setMinutes] = useState(reservation.actual_minutes || defaultDuration);
+
+    return (
+        <div className="glass-panel p-6 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                    <span className="px-2 py-1 rounded text-xs font-bold bg-white/10 border border-white/10">
+                        {reservation.student.grade}年
+                    </span>
+                    <span className="px-2 py-1 rounded text-xs font-bold bg-primary/20 text-primary border border-primary/20">
+                        実習{reservation.slot.training_type}
+                    </span>
+                    <span className="text-slate-400 text-sm">
+                        {formatDate(reservation.slot.date)} {reservation.slot.start_time.slice(0, 5)}-{reservation.slot.end_time.slice(0, 5)}
+                    </span>
+                </div>
+                <div className="flex items-center gap-3">
+                    <h3 className="text-lg font-bold">{reservation.student.name}</h3>
+                    <span className="text-sm text-slate-500">{reservation.student.student_number}</span>
+                </div>
+            </div>
+
+            <div className="flex items-center gap-6">
+                <div className="flex items-center gap-3">
+                    <label className="text-sm text-slate-400">実績時間</label>
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="number"
+                            className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 w-20 text-center focus:outline-none focus:border-primary"
+                            value={minutes}
+                            onChange={(e) => setMinutes(parseInt(e.target.value) || 0)}
+                            disabled={isProcessing || isCompleted}
+                        />
+                        <span className="text-sm font-medium">分</span>
+                    </div>
+                </div>
+
+                {!isCompleted && (
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => onApprove(reservation, minutes)}
+                            disabled={isProcessing}
+                            className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors disabled:opacity-50"
+                            title="承認"
+                        >
+                            <Check className="w-5 h-5" />
+                        </button>
+                        <button
+                            onClick={() => onCancel(reservation)}
+                            disabled={isProcessing}
+                            className="p-2 rounded-lg bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 transition-colors disabled:opacity-50"
+                            title="欠席/キャンセル"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+                )}
+
+                {isCompleted && (
+                    <span className="text-emerald-400 text-sm font-bold flex items-center gap-1">
+                        <Check className="w-4 h-4" /> 承認済
+                    </span>
+                )}
+            </div>
+        </div>
+    );
+};
+
+const formatDate = (dateStr) => {
+    const date = new Date(dateStr);
+    const days = ['日', '月', '火', '水', '木', '金', '土'];
+    return `${date.getMonth() + 1}月${date.getDate()}日(${days[date.getDay()]})`;
+};
