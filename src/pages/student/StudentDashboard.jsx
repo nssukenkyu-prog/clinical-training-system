@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { auth, db } from '../../lib/firebase';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, orderBy } from 'firebase/firestore';
 import { Clock, Calendar, CheckCircle, AlertCircle, Plus } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -14,53 +14,29 @@ export default function StudentDashboard() {
     const navigate = useNavigate();
 
     useEffect(() => {
-        loadData();
+        loadInitialData();
     }, []);
 
-    const loadData = async () => {
+    const loadInitialData = async () => {
         try {
-            const user = auth.currentUser;
-            if (!user) return;
+            // セッションから学生IDを取得
+            const studentId = sessionStorage.getItem('clinical_student_id');
+
+            if (!studentId) {
+                navigate('/');
+                return;
+            }
 
             // 学生情報を取得
-            const studentsRef = collection(db, 'students');
-            // Try to find student by auth_user_id (uid) or email
-            // Ideally we use uid.
-            const qStudent = query(studentsRef, where('auth_user_id', '==', user.uid));
-            let studentSnapshot = await getDocs(qStudent);
+            const studentDoc = await getDoc(doc(db, 'students', studentId));
 
-            // Fallback to email if not found (for migration safety)
-            if (studentSnapshot.empty && user.email) {
-                const qStudentEmail = query(studentsRef, where('email', '==', user.email));
-                studentSnapshot = await getDocs(qStudentEmail);
+            if (!studentDoc.exists()) {
+                sessionStorage.clear();
+                navigate('/');
+                return;
             }
 
-            if (!studentSnapshot.empty) {
-                const studentDoc = studentSnapshot.docs[0];
-                const studentData = { id: studentDoc.id, ...studentDoc.data() };
-                setStudent(studentData);
-
-                // 予約一覧を取得
-                const reservationsRef = collection(db, 'reservations');
-                const qReservations = query(
-                    reservationsRef,
-                    where('student_id', '==', studentData.id),
-                    orderBy('created_at', 'desc')
-                );
-                const reservationsSnapshot = await getDocs(qReservations);
-
-                const reservationsData = reservationsSnapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
-
-                setReservations(reservationsData);
-
-                // 累積時間を計算
-                const completed = reservationsData.filter(r => r.status === 'completed');
-                const total = completed.reduce((sum, r) => sum + (r.actual_minutes || 0), 0);
-                setTotalMinutes(total);
-            }
+            setStudent({ id: studentDoc.id, ...studentDoc.data() });
 
             // システム設定を取得
             const settingsRef = collection(db, 'settings');

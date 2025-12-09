@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { auth, db } from '../../lib/firebase';
-import { collection, query, where, getDocs, addDoc, updateDoc, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, updateDoc, doc, getDoc } from 'firebase/firestore';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, AlertCircle } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -27,26 +27,24 @@ export default function SlotReservation() {
 
     const loadInitialData = async () => {
         try {
-            const user = auth.currentUser;
-            if (!user) {
-                navigate('/student/login');
+            // セッションから学生IDを取得
+            const studentId = sessionStorage.getItem('clinical_student_id');
+
+            if (!studentId) {
+                navigate('/');
                 return;
             }
 
             // 学生情報を取得
-            const studentsRef = collection(db, 'students');
-            const qStudent = query(studentsRef, where('auth_user_id', '==', user.uid));
-            let studentSnapshot = await getDocs(qStudent);
+            const studentDoc = await getDoc(doc(db, 'students', studentId));
 
-            if (studentSnapshot.empty && user.email) {
-                const qStudentEmail = query(studentsRef, where('email', '==', user.email));
-                studentSnapshot = await getDocs(qStudentEmail);
+            if (!studentDoc.exists()) {
+                sessionStorage.clear();
+                navigate('/');
+                return;
             }
 
-            if (!studentSnapshot.empty) {
-                const studentDoc = studentSnapshot.docs[0];
-                setStudent({ id: studentDoc.id, ...studentDoc.data() });
-            }
+            setStudent({ id: studentDoc.id, ...studentDoc.data() });
 
             // 設定を取得
             const settingsRef = collection(db, 'settings');

@@ -10,8 +10,20 @@ const Layout = ({ children, userRole, userName }) => {
     const navigate = useNavigate();
 
     const handleLogout = async () => {
-        await signOut(auth);
-        navigate(userRole === 'admin' ? '/admin/login' : '/student/login');
+        if (userRole === 'admin') {
+            await signOut(auth);
+            navigate('/admin/login');
+        } else {
+            // Student: Clear session
+            sessionStorage.removeItem('clinical_student_id');
+            sessionStorage.removeItem('clinical_student_name');
+            // Sign out from anonymous auth if needed, but not strictly required if we just clear session.
+            // But let's be clean.
+            if (auth.currentUser?.isAnonymous) {
+                await signOut(auth);
+            }
+            navigate('/');
+        }
     };
 
     const navItems = userRole === 'admin' ? [

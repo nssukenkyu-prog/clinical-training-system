@@ -6,8 +6,7 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import Layout from './components/Layout';
 
 // Pages
-import LandingPage from './pages/LandingPage';
-import StudentLogin from './pages/student/StudentLogin';
+import StudentEntry from './pages/student/StudentEntry';
 import SetPassword from './pages/student/SetPassword';
 import StudentDashboard from './pages/student/StudentDashboard';
 import SlotReservation from './pages/student/SlotReservation';
