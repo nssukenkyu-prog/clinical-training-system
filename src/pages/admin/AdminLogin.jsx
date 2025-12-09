@@ -124,10 +124,10 @@ export default function AdminLogin() {
 
                 <div className="mt-8 text-center space-y-4">
                     <Link
-                        to="/student/login"
+                        to="/"
                         className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-indigo-600 transition-colors font-medium"
                     >
-                        学生ログインはこちら
+                        学生用スタート画面へ
                     </Link>
 
                     <p className="text-xs text-slate-400">

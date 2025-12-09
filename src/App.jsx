@@ -101,13 +101,17 @@ function App() {
         <Route
           path="/student/*"
           element={
-            <Layout userRole="student" userName={sessionStorage.getItem('clinical_student_name') || 'Student'}>
-              <Routes>
-                <Route path="dashboard" element={<StudentDashboard />} />
-                <Route path="reservation" element={<SlotReservation />} />
-                <Route path="*" element={<Navigate to="dashboard" replace />} />
-              </Routes>
-            </Layout>
+            sessionStorage.getItem('clinical_student_id') ? (
+              <Layout userRole="student" userName={sessionStorage.getItem('clinical_student_name') || 'Student'}>
+                <Routes>
+                  <Route path="dashboard" element={<StudentDashboard />} />
+                  <Route path="reservation" element={<SlotReservation />} />
+                  <Route path="*" element={<Navigate to="dashboard" replace />} />
+                </Routes>
+              </Layout>
+            ) : (
+              <Navigate to="/" replace />
+            )
           }
         />
 
