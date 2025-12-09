@@ -76,7 +76,7 @@ export default function ResultApproval() {
 
         } catch (error) {
             console.error('Error loading reservations:', error);
-            alert('データの読み込みに失敗しました');
+            // alert('データの読み込みに失敗しました');
         } finally {
             setLoading(false);
         }
@@ -151,16 +151,16 @@ export default function ResultApproval() {
         <div className="space-y-8">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold">実績承認</h1>
-                    <p className="text-slate-400 mt-1">実習の実績時間を確定・承認します</p>
+                    <h1 className="text-3xl font-bold text-slate-900">実績承認</h1>
+                    <p className="text-slate-500 mt-1">実習の実績時間を確定・承認します</p>
                 </div>
 
-                <div className="flex bg-white/5 p-1 rounded-lg border border-white/10">
+                <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
                     <button
                         onClick={() => setFilter('pending')}
                         className={clsx(
                             "px-4 py-2 rounded-md text-sm font-medium transition-colors",
-                            filter === 'pending' ? "bg-primary text-white" : "text-slate-400 hover:text-white"
+                            filter === 'pending' ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"
                         )}
                     >
                         未承認
@@ -169,7 +169,7 @@ export default function ResultApproval() {
                         onClick={() => setFilter('completed')}
                         className={clsx(
                             "px-4 py-2 rounded-md text-sm font-medium transition-colors",
-                            filter === 'completed' ? "bg-primary text-white" : "text-slate-400 hover:text-white"
+                            filter === 'completed' ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"
                         )}
                     >
                         承認済
@@ -179,11 +179,11 @@ export default function ResultApproval() {
 
             {loading ? (
                 <div className="flex items-center justify-center h-64">
-                    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                    <div className="w-8 h-8 border-2 border-primary border-t-white/0 rounded-full animate-spin"></div>
                 </div>
             ) : reservations.length === 0 ? (
-                <div className="glass-panel p-12 rounded-2xl text-center text-slate-400">
-                    <CheckSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <div className="glass-panel p-12 rounded-2xl text-center text-slate-500 bg-white shadow-lg border-slate-100">
+                    <CheckSquare className="w-12 h-12 mx-auto mb-4 opacity-20 text-slate-700" />
                     <p>対象のデータはありません</p>
                 </div>
             ) : (
@@ -213,37 +213,37 @@ const ResultCard = ({ reservation, defaultDuration, onApprove, onCancel, isProce
     const [minutes, setMinutes] = useState(reservation.actual_minutes || defaultDuration);
 
     return (
-        <div className="glass-panel p-6 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="glass-panel p-6 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
             <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
-                    <span className="px-2 py-1 rounded text-xs font-bold bg-white/10 border border-white/10">
+                    <span className="px-2 py-1 rounded text-xs font-bold bg-slate-100 border border-slate-200 text-slate-600">
                         {reservation.student.grade}年
                     </span>
-                    <span className="px-2 py-1 rounded text-xs font-bold bg-primary/20 text-primary border border-primary/20">
+                    <span className="px-2 py-1 rounded text-xs font-bold bg-blue-50 text-blue-600 border border-blue-100">
                         実習{reservation.slot.training_type}
                     </span>
-                    <span className="text-slate-400 text-sm">
+                    <span className="text-slate-500 text-sm font-medium">
                         {formatDate(reservation.slot.date)} {reservation.slot.start_time.slice(0, 5)}-{reservation.slot.end_time.slice(0, 5)}
                     </span>
                 </div>
                 <div className="flex items-center gap-3">
-                    <h3 className="text-lg font-bold">{reservation.student.name}</h3>
+                    <h3 className="text-lg font-bold text-slate-900">{reservation.student.name}</h3>
                     <span className="text-sm text-slate-500">{reservation.student.student_number}</span>
                 </div>
             </div>
 
             <div className="flex items-center gap-6">
                 <div className="flex items-center gap-3">
-                    <label className="text-sm text-slate-400">実績時間</label>
+                    <label className="text-sm text-slate-500 font-medium">実績時間</label>
                     <div className="flex items-center gap-2">
                         <input
                             type="number"
-                            className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 w-20 text-center focus:outline-none focus:border-primary"
+                            className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 w-20 text-center focus:outline-none focus:border-primary text-slate-900 font-bold disabled:bg-slate-100 disabled:text-slate-500"
                             value={minutes}
                             onChange={(e) => setMinutes(parseInt(e.target.value) || 0)}
                             disabled={isProcessing || isCompleted}
                         />
-                        <span className="text-sm font-medium">分</span>
+                        <span className="text-sm font-medium text-slate-600">分</span>
                     </div>
                 </div>
 
@@ -252,7 +252,7 @@ const ResultCard = ({ reservation, defaultDuration, onApprove, onCancel, isProce
                         <button
                             onClick={() => onApprove(reservation, minutes)}
                             disabled={isProcessing}
-                            className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors disabled:opacity-50"
+                            className="p-2 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100 transition-colors disabled:opacity-50"
                             title="承認"
                         >
                             <Check className="w-5 h-5" />
@@ -260,7 +260,7 @@ const ResultCard = ({ reservation, defaultDuration, onApprove, onCancel, isProce
                         <button
                             onClick={() => onCancel(reservation)}
                             disabled={isProcessing}
-                            className="p-2 rounded-lg bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 transition-colors disabled:opacity-50"
+                            className="p-2 rounded-lg bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-100 transition-colors disabled:opacity-50"
                             title="欠席/キャンセル"
                         >
                             <X className="w-5 h-5" />
@@ -269,17 +269,11 @@ const ResultCard = ({ reservation, defaultDuration, onApprove, onCancel, isProce
                 )}
 
                 {isCompleted && (
-                    <span className="text-emerald-400 text-sm font-bold flex items-center gap-1">
+                    <span className="text-emerald-600 text-sm font-bold flex items-center gap-1 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100">
                         <Check className="w-4 h-4" /> 承認済
                     </span>
                 )}
             </div>
         </div>
     );
-};
-
-const formatDate = (dateStr) => {
-    const date = new Date(dateStr);
-    const days = ['日', '月', '火', '水', '木', '金', '土'];
-    return `${date.getMonth() + 1}月${date.getDate()}日(${days[date.getDay()]})`;
 };

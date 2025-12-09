@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, query, where, getDocs, addDoc, deleteDoc, doc, writeBatch, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, deleteDoc, doc, writeBatch } from 'firebase/firestore';
 import { ChevronLeft, ChevronRight, Plus, Trash2, Calendar, Clock, Users, X } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -22,50 +22,57 @@ export default function SlotManagement() {
     }, [currentMonth]);
 
     const loadSlots = async () => {
-        const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-        const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+        setLoading(true);
+        try {
+            const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+            const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
 
-        const startDate = startOfMonth.toISOString().split('T')[0];
-        const endDate = endOfMonth.toISOString().split('T')[0];
+            const startDate = startOfMonth.toISOString().split('T')[0];
+            const endDate = endOfMonth.toISOString().split('T')[0];
 
-        // 1. Fetch Slots
-        const slotsRef = collection(db, 'slots');
-        const qSlots = query(
-            slotsRef,
-            where('date', '>=', startDate),
-            where('date', '<=', endDate)
-        );
-        const slotsSnapshot = await getDocs(qSlots);
-        const slotsData = slotsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            // 1. Fetch Slots
+            const slotsRef = collection(db, 'slots');
+            const qSlots = query(
+                slotsRef,
+                where('date', '>=', startDate),
+                where('date', '<=', endDate)
+            );
+            const slotsSnapshot = await getDocs(qSlots);
+            const slotsData = slotsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-        // 2. Fetch Reservations for this month
-        const reservationsRef = collection(db, 'reservations');
-        const qReservations = query(
-            reservationsRef,
-            where('slot_date', '>=', startDate),
-            where('slot_date', '<=', endDate),
-            where('status', '==', 'confirmed')
-        );
-        const reservationsSnapshot = await getDocs(qReservations);
-        const reservationsData = reservationsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            // 2. Fetch Reservations for this month
+            const reservationsRef = collection(db, 'reservations');
+            const qReservations = query(
+                reservationsRef,
+                where('slot_date', '>=', startDate),
+                where('slot_date', '<=', endDate),
+                where('status', '==', 'confirmed')
+            );
+            const reservationsSnapshot = await getDocs(qReservations);
+            const reservationsData = reservationsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-        // 3. Merge
-        const slotsWithReservations = slotsData.map(slot => {
-            const slotReservations = reservationsData.filter(r => r.slot_id === slot.id);
-            return {
-                ...slot,
-                reservations: slotReservations
-            };
-        });
+            // 3. Merge
+            const slotsWithReservations = slotsData.map(slot => {
+                const slotReservations = reservationsData.filter(r => r.slot_id === slot.id);
+                return {
+                    ...slot,
+                    reservations: slotReservations
+                };
+            });
 
-        // Sort
-        slotsWithReservations.sort((a, b) => {
-            if (a.date !== b.date) return a.date.localeCompare(b.date);
-            return a.start_time.localeCompare(b.start_time);
-        });
+            // Sort
+            slotsWithReservations.sort((a, b) => {
+                if (a.date !== b.date) return a.date.localeCompare(b.date);
+                return a.start_time.localeCompare(b.start_time);
+            });
 
-        setSlots(slotsWithReservations);
-        setLoading(false);
+            setSlots(slotsWithReservations);
+        } catch (error) {
+            console.error("Error loading slots:", error);
+            // alert('データの読み込みに失敗しました'); // Don't block UI on load error
+        } finally {
+            setLoading(false);
+        }
     };
 
     const getDaysInMonth = () => {
@@ -198,7 +205,7 @@ export default function SlotManagement() {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-8 h-8 border-2 border-primary border-t-white/0 rounded-full animate-spin"></div>
             </div>
         );
     }
@@ -208,28 +215,28 @@ export default function SlotManagement() {
     return (
         <div className="space-y-8">
             <div>
-                <h1 className="text-3xl font-bold">実習枠管理</h1>
-                <p className="text-slate-400 mt-1">実習枠の作成・編集・削除を行います</p>
+                <h1 className="text-3xl font-bold text-slate-900">実習枠管理</h1>
+                <p className="text-slate-500 mt-1">実習枠の作成・編集・削除を行います</p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Calendar */}
-                <div className="lg:col-span-2 glass-panel p-6 rounded-2xl">
+                <div className="lg:col-span-2 glass-panel p-6 rounded-2xl bg-white shadow-lg border-slate-100">
                     <div className="flex items-center justify-between mb-6">
-                        <button onClick={prevMonth} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+                        <button onClick={prevMonth} className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-600">
                             <ChevronLeft className="w-5 h-5" />
                         </button>
-                        <h2 className="text-xl font-bold">
+                        <h2 className="text-xl font-bold text-slate-900">
                             {currentMonth.getFullYear()}年 {currentMonth.getMonth() + 1}月
                         </h2>
-                        <button onClick={nextMonth} className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+                        <button onClick={nextMonth} className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-600">
                             <ChevronRight className="w-5 h-5" />
                         </button>
                     </div>
 
                     <div className="grid grid-cols-7 gap-2 mb-2">
                         {['日', '月', '火', '水', '木', '金', '土'].map(day => (
-                            <div key={day} className="text-center text-sm text-slate-400 py-2">
+                            <div key={day} className="text-center text-sm text-slate-500 py-2 font-medium">
                                 {day}
                             </div>
                         ))}
@@ -250,15 +257,15 @@ export default function SlotManagement() {
                                     key={index}
                                     onClick={() => setSelectedDate(date)}
                                     className={clsx(
-                                        "aspect-square rounded-xl flex flex-col items-center justify-center relative transition-all",
-                                        isSelected ? "bg-primary text-white shadow-lg shadow-primary/30 scale-105" :
-                                            hasSlots ? "bg-white/5 hover:bg-white/10 text-white cursor-pointer border border-white/5" :
-                                                "bg-transparent text-slate-600 hover:bg-white/5 hover:text-slate-400"
+                                        "aspect-square rounded-xl flex flex-col items-center justify-center relative transition-all border",
+                                        isSelected ? "bg-primary text-white shadow-md border-primary scale-105" :
+                                            hasSlots ? "bg-blue-50 hover:bg-blue-100 text-slate-700 cursor-pointer border-blue-100" :
+                                                "bg-white hover:bg-slate-50 text-slate-500 border-slate-100"
                                     )}
                                 >
                                     <span className="text-lg font-medium">{date.getDate()}</span>
                                     {hasSlots && !isSelected && (
-                                        <span className="text-[10px] text-slate-400 mt-1">
+                                        <span className="text-[10px] text-blue-600 mt-1 font-bold">
                                             {dateSlots.length}枠
                                         </span>
                                     )}
@@ -269,16 +276,16 @@ export default function SlotManagement() {
                 </div>
 
                 {/* Selected Date Details */}
-                <div className="glass-panel p-6 rounded-2xl h-fit">
+                <div className="glass-panel p-6 rounded-2xl h-fit bg-white shadow-lg border-slate-100">
                     <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-xl font-bold flex items-center gap-2">
+                        <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900">
                             <Calendar className="w-5 h-5 text-primary" />
                             {selectedDate ? formatDate(selectedDate) : '日付を選択'}
                         </h2>
                         {selectedDate && (
                             <button
                                 onClick={() => setShowModal(true)}
-                                className="p-2 rounded-lg bg-primary text-white hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
+                                className="p-2 rounded-lg bg-primary text-white hover:bg-primary/90 transition-colors shadow-md shadow-primary/20"
                             >
                                 <Plus className="w-5 h-5" />
                             </button>
@@ -286,11 +293,11 @@ export default function SlotManagement() {
                     </div>
 
                     {!selectedDate ? (
-                        <div className="text-center py-12 text-slate-500">
+                        <div className="text-center py-12 text-slate-400 bg-slate-50 rounded-xl border border-slate-100 dashed">
                             <p>カレンダーから日付を<br />選択してください</p>
                         </div>
                     ) : selectedDateSlots.length === 0 ? (
-                        <div className="text-center py-12 text-slate-500">
+                        <div className="text-center py-12 text-slate-400 bg-slate-50 rounded-xl border border-slate-100 dashed">
                             <p>この日に枠はありません</p>
                         </div>
                     ) : (
@@ -298,26 +305,26 @@ export default function SlotManagement() {
                             {selectedDateSlots.map(slot => {
                                 const confirmed = (slot.reservations || []).length;
                                 return (
-                                    <div key={slot.id} className="p-4 rounded-xl bg-white/5 border border-white/10">
+                                    <div key={slot.id} className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm">
                                         <div className="flex items-center justify-between mb-2">
-                                            <div className="flex items-center gap-2 font-bold">
+                                            <div className="flex items-center gap-2 font-bold text-slate-700">
                                                 <Clock className="w-4 h-4 text-slate-400" />
                                                 {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
                                             </div>
-                                            <span className="text-xs font-bold px-2 py-1 rounded bg-white/10 text-slate-300">
+                                            <span className="text-xs font-bold px-2 py-1 rounded bg-slate-100 text-slate-600 border border-slate-200">
                                                 {getTrainingTypeLabel(slot.training_type)}
                                             </span>
                                         </div>
 
                                         <div className="flex items-center justify-between mt-3">
-                                            <span className="text-sm text-slate-400 flex items-center gap-1">
+                                            <span className="text-sm text-slate-500 flex items-center gap-1">
                                                 <Users className="w-4 h-4" />
                                                 予約: {confirmed} / {slot.max_capacity}
                                             </span>
                                             <button
                                                 onClick={() => handleDeleteSlot(slot.id)}
                                                 disabled={confirmed > 0}
-                                                className="p-2 rounded-lg hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-500"
+                                                className="p-2 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400"
                                                 title={confirmed > 0 ? '予約がある枠は削除できません' : '削除'}
                                             >
                                                 <Trash2 className="w-4 h-4" />
@@ -333,20 +340,20 @@ export default function SlotManagement() {
 
             {/* Create Slot Modal */}
             {showModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowModal(false)}>
-                    <div className="glass-panel p-6 rounded-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setShowModal(false)}>
+                    <div className="glass-panel p-6 rounded-2xl w-full max-w-md bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-xl font-bold">{formatDate(selectedDate)} に枠を追加</h3>
-                            <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-white">
+                            <h3 className="text-xl font-bold text-slate-900">{formatDate(selectedDate)} に枠を追加</h3>
+                            <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
                                 <X className="w-6 h-6" />
                             </button>
                         </div>
 
                         <form onSubmit={handleCreateSlot} className="space-y-6">
                             <div>
-                                <label className="block text-sm font-medium text-slate-300 mb-2">実習区分</label>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">実習区分</label>
                                 <select
-                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-primary transition-colors"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:border-primary text-slate-900 transition-colors"
                                     value={formData.trainingType}
                                     onChange={e => setFormData({ ...formData, trainingType: e.target.value })}
                                 >
@@ -358,20 +365,20 @@ export default function SlotManagement() {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-300 mb-2">開始時刻</label>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">開始時刻</label>
                                     <input
                                         type="time"
-                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-primary transition-colors"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:border-primary text-slate-900 transition-colors"
                                         value={formData.startTime}
                                         onChange={e => setFormData({ ...formData, startTime: e.target.value })}
                                         required
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-300 mb-2">終了時刻</label>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">終了時刻</label>
                                     <input
                                         type="time"
-                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-primary transition-colors"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:border-primary text-slate-900 transition-colors"
                                         value={formData.endTime}
                                         onChange={e => setFormData({ ...formData, endTime: e.target.value })}
                                         required
@@ -380,10 +387,10 @@ export default function SlotManagement() {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-slate-300 mb-2">最大人数</label>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">最大人数</label>
                                 <input
                                     type="number"
-                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-primary transition-colors"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:border-primary text-slate-900 transition-colors"
                                     value={formData.maxCapacity}
                                     onChange={e => setFormData({ ...formData, maxCapacity: parseInt(e.target.value) })}
                                     min="1"
@@ -395,14 +402,14 @@ export default function SlotManagement() {
                             <div className="flex gap-3 pt-4">
                                 <button
                                     type="button"
-                                    className="flex-1 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 transition-colors"
+                                    className="flex-1 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors font-medium"
                                     onClick={handleBulkCreate}
                                 >
                                     一括作成
                                 </button>
                                 <button
                                     type="submit"
-                                    className="flex-1 px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
+                                    className="flex-1 px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 font-bold"
                                 >
                                     作成
                                 </button>
