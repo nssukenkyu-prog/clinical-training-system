@@ -4,6 +4,14 @@ import { collection, query, where, getDocs, updateDoc, doc, orderBy, documentId 
 import { CheckSquare, Search, Check, X, Clock } from 'lucide-react';
 import { clsx } from 'clsx';
 
+// Helper function (module scope for use in ResultCard)
+const formatDate = (dateStr) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    const days = ['日', '月', '火', '水', '木', '金', '土'];
+    return `${date.getMonth() + 1}月${date.getDate()}日(${days[date.getDay()]})`;
+};
+
 export default function ResultApproval() {
     const [reservations, setReservations] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -140,12 +148,8 @@ export default function ResultApproval() {
         }
     };
 
-    const formatDate = (dateStr) => {
-        if (!dateStr) return '';
-        const date = new Date(dateStr);
-        const days = ['日', '月', '火', '水', '木', '金', '土'];
-        return `${date.getMonth() + 1}月${date.getDate()}日(${days[date.getDay()]})`;
-    };
+
+    // formatDate is moved to module scope
 
     return (
         <div className="space-y-8">

@@ -36,7 +36,27 @@ export default function StudentDashboard() {
                 return;
             }
 
-            setStudent({ id: studentDoc.id, ...studentDoc.data() });
+            const studentData = { id: studentDoc.id, ...studentDoc.data() };
+            setStudent(studentData);
+
+            // 予約一覧を取得
+            const reservationsRef = collection(db, 'reservations');
+            const qReservations = query(
+                reservationsRef,
+                where('student_id', '==', studentId),
+                orderBy('created_at', 'desc')
+            );
+            const reservationsSnapshot = await getDocs(qReservations);
+            const reservationsData = reservationsSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            setReservations(reservationsData);
+
+            // 累積時間を計算
+            const completed = reservationsData.filter(r => r.status === 'completed');
+            const total = completed.reduce((sum, r) => sum + (r.actual_minutes || 0), 0);
+            setTotalMinutes(total);
 
             // システム設定を取得
             const settingsRef = collection(db, 'settings');

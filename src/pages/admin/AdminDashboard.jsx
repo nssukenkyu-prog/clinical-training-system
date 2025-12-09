@@ -271,7 +271,7 @@ export default function AdminDashboard() {
                             <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
                         </Link>
 
-                        <Link to="/admin/results" className="bg-white border border-slate-200 w-full p-4 rounded-xl flex items-center justify-between group hover:bg-slate-50 hover:shadow-sm transition-all">
+                        <Link to="/admin/approvals" className="bg-white border border-slate-200 w-full p-4 rounded-xl flex items-center justify-between group hover:bg-slate-50 hover:shadow-sm transition-all">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 rounded-lg bg-purple-50 text-purple-600 border border-purple-100">
                                     <CheckSquare className="w-5 h-5" />
