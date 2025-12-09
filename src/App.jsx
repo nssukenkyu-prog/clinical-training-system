@@ -7,7 +7,8 @@ import Layout from './components/Layout';
 
 // Pages
 import StudentEntry from './pages/student/StudentEntry';
-import SetPassword from './pages/student/SetPassword';
+// import SetPassword from './pages/student/SetPassword'; // Removed
+
 import StudentDashboard from './pages/student/StudentDashboard';
 import SlotReservation from './pages/student/SlotReservation';
 
@@ -93,26 +94,20 @@ function App() {
     <Router>
       <Routes>
         {/* Public Routes */}
-        <Route path="/" element={!user ? <LandingPage /> : <Navigate to={userRole === 'admin' ? "/admin/dashboard" : "/student/dashboard"} replace />} />
-        <Route path="/student/login" element={!user ? <StudentLogin /> : <Navigate to="/student/dashboard" replace />} />
-        <Route path="/student/set-password" element={<SetPassword />} />
+        <Route path="/" element={<StudentEntry />} />
         <Route path="/admin/login" element={!user ? <AdminLogin /> : <Navigate to="/admin/dashboard" replace />} />
 
         {/* Student Routes */}
         <Route
           path="/student/*"
           element={
-            user && userRole === 'student' ? (
-              <Layout userRole="student" userName={userName}>
-                <Routes>
-                  <Route path="dashboard" element={<StudentDashboard />} />
-                  <Route path="reservation" element={<SlotReservation />} />
-                  <Route path="*" element={<Navigate to="dashboard" replace />} />
-                </Routes>
-              </Layout>
-            ) : (
-              <Navigate to="/student/login" replace />
-            )
+            <Layout userRole="student" userName={sessionStorage.getItem('clinical_student_name') || 'Student'}>
+              <Routes>
+                <Route path="dashboard" element={<StudentDashboard />} />
+                <Route path="reservation" element={<SlotReservation />} />
+                <Route path="*" element={<Navigate to="dashboard" replace />} />
+              </Routes>
+            </Layout>
           }
         />
 
@@ -140,7 +135,7 @@ function App() {
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </Router>
+    </Router >
   );
 }
 
