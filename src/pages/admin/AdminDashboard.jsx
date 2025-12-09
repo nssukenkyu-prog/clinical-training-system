@@ -159,8 +159,8 @@ export default function AdminDashboard() {
     return (
         <div className="space-y-8">
             <div>
-                <h1 className="text-3xl font-bold">管理者ダッシュボード</h1>
-                <p className="text-slate-400 mt-1">システム全体の状況を確認できます</p>
+                <h1 className="text-3xl font-bold text-slate-900">管理者ダッシュボード</h1>
+                <p className="text-slate-500 mt-1">システム全体の状況を確認できます</p>
             </div>
 
             {/* Stats Grid */}
@@ -169,47 +169,47 @@ export default function AdminDashboard() {
                     label="今日の予約"
                     value={stats.todayReservations}
                     icon={Calendar}
-                    color="text-blue-400"
-                    bg="bg-blue-500/10"
+                    color="text-blue-600"
+                    bg="bg-blue-50"
                 />
                 <StatCard
                     label="登録学生数"
                     value={stats.totalStudents}
                     icon={Users}
-                    color="text-emerald-400"
-                    bg="bg-emerald-500/10"
+                    color="text-emerald-600"
+                    bg="bg-emerald-50"
                 />
                 <StatCard
                     label="有効な実習枠"
                     value={stats.activeSlots}
                     icon={Activity}
-                    color="text-amber-400"
-                    bg="bg-amber-500/10"
+                    color="text-amber-600"
+                    bg="bg-amber-50"
                 />
                 <StatCard
                     label="完了した実習"
                     value={stats.completedTrainings}
                     icon={CheckSquare}
-                    color="text-purple-400"
-                    bg="bg-purple-500/10"
+                    color="text-purple-600"
+                    bg="bg-purple-50"
                 />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Main Content (Today's Slots) */}
-                <div className="lg:col-span-2 glass-panel p-6 rounded-2xl">
+                <div className="lg:col-span-2 glass-panel p-6 rounded-2xl bg-white shadow-lg border-slate-100">
                     <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-xl font-bold flex items-center gap-2">
+                        <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900">
                             <Clock className="w-5 h-5 text-primary" />
                             本日の実習枠
                         </h2>
-                        <span className="text-sm text-slate-400 bg-white/5 px-3 py-1 rounded-full">
+                        <span className="text-sm text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
                             {new Date().toLocaleDateString('ja-JP')}
                         </span>
                     </div>
 
                     {todaySlots.length === 0 ? (
-                        <div className="text-center py-12 text-slate-500">
+                        <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-slate-100 dashed">
                             <p>今日の実習枠はありません</p>
                         </div>
                     ) : (
@@ -219,19 +219,19 @@ export default function AdminDashboard() {
                                 const isFull = confirmed.length >= slot.max_capacity;
 
                                 return (
-                                    <div key={slot.id} className="p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+                                    <div key={slot.id} className="p-4 rounded-xl bg-white border border-slate-200 hover:shadow-md transition-all">
                                         <div className="flex items-center justify-between mb-3">
                                             <div className="flex items-center gap-3">
-                                                <span className="text-lg font-bold">
+                                                <span className="text-lg font-bold text-slate-900">
                                                     {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
                                                 </span>
-                                                <span className="text-xs font-bold px-2 py-1 rounded bg-white/10 text-slate-300">
+                                                <span className="text-xs font-bold px-2 py-1 rounded bg-slate-100 text-slate-600 border border-slate-200">
                                                     {getTrainingTypeLabel(slot.training_type)}
                                                 </span>
                                             </div>
                                             <span className={clsx(
-                                                "text-xs font-bold px-2 py-1 rounded flex items-center gap-1",
-                                                isFull ? "bg-rose-500/20 text-rose-300" : "bg-emerald-500/20 text-emerald-300"
+                                                "text-xs font-bold px-2 py-1 rounded flex items-center gap-1 border",
+                                                isFull ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-emerald-50 text-emerald-600 border-emerald-200"
                                             )}>
                                                 <Users className="w-3 h-3" />
                                                 {confirmed.length} / {slot.max_capacity}
@@ -241,12 +241,13 @@ export default function AdminDashboard() {
                                         <div className="flex flex-wrap gap-2">
                                             {confirmed.length > 0 ? (
                                                 confirmed.map(r => (
-                                                    <span key={r.id} className="text-xs px-2 py-1 rounded bg-primary/20 text-primary border border-primary/20">
+                                                    <span key={r.id} className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-600 border border-blue-200 flex items-center gap-1">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
                                                         {r.students?.name || '---'}
                                                     </span>
                                                 ))
                                             ) : (
-                                                <span className="text-xs text-slate-500 italic">予約なし</span>
+                                                <span className="text-xs text-slate-400 italic">予約なし</span>
                                             )}
                                         </div>
                                     </div>
@@ -257,37 +258,37 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* Quick Actions */}
-                <div className="glass-panel p-6 rounded-2xl h-fit">
-                    <h2 className="text-xl font-bold mb-6">クイックアクション</h2>
+                <div className="glass-panel p-6 rounded-2xl h-fit bg-white shadow-lg border-slate-100">
+                    <h2 className="text-xl font-bold mb-6 text-slate-900">クイックアクション</h2>
                     <div className="space-y-3">
-                        <Link to="/admin/slots" className="glass-button w-full p-4 rounded-xl flex items-center justify-between group hover:bg-white/10">
+                        <Link to="/admin/slots" className="bg-white border border-slate-200 w-full p-4 rounded-xl flex items-center justify-between group hover:bg-slate-50 hover:shadow-sm transition-all">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-blue-500/20 text-blue-400">
+                                <div className="p-2 rounded-lg bg-blue-50 text-blue-600 border border-blue-100">
                                     <Calendar className="w-5 h-5" />
                                 </div>
-                                <span className="font-medium">実習枠を作成</span>
+                                <span className="font-medium text-slate-700 group-hover:text-slate-900">実習枠を作成</span>
                             </div>
-                            <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-white transition-colors" />
+                            <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
                         </Link>
 
-                        <Link to="/admin/results" className="glass-button w-full p-4 rounded-xl flex items-center justify-between group hover:bg-white/10">
+                        <Link to="/admin/results" className="bg-white border border-slate-200 w-full p-4 rounded-xl flex items-center justify-between group hover:bg-slate-50 hover:shadow-sm transition-all">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-purple-500/20 text-purple-400">
+                                <div className="p-2 rounded-lg bg-purple-50 text-purple-600 border border-purple-100">
                                     <CheckSquare className="w-5 h-5" />
                                 </div>
-                                <span className="font-medium">実績を承認</span>
+                                <span className="font-medium text-slate-700 group-hover:text-slate-900">実績を承認</span>
                             </div>
-                            <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-white transition-colors" />
+                            <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
                         </Link>
 
-                        <Link to="/admin/students" className="glass-button w-full p-4 rounded-xl flex items-center justify-between group hover:bg-white/10">
+                        <Link to="/admin/students" className="bg-white border border-slate-200 w-full p-4 rounded-xl flex items-center justify-between group hover:bg-slate-50 hover:shadow-sm transition-all">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400">
+                                <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100">
                                     <Users className="w-5 h-5" />
                                 </div>
-                                <span className="font-medium">学生を管理</span>
+                                <span className="font-medium text-slate-700 group-hover:text-slate-900">学生を管理</span>
                             </div>
-                            <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-white transition-colors" />
+                            <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
                         </Link>
                     </div>
                 </div>
@@ -297,13 +298,13 @@ export default function AdminDashboard() {
 }
 
 const StatCard = ({ label, value, icon: Icon, color, bg }) => (
-    <div className="glass-panel p-6 rounded-2xl flex items-center gap-4">
-        <div className={`p-3 rounded-xl ${bg} ${color}`}>
+    <div className="bg-white p-6 rounded-2xl flex items-center gap-4 shadow-sm border border-slate-100">
+        <div className={`p-3 rounded-xl ${bg} ${color} border border-slate-200`}>
             <Icon className="w-6 h-6" />
         </div>
         <div>
-            <p className="text-sm text-slate-400">{label}</p>
-            <p className="text-2xl font-bold">{value}</p>
+            <p className="text-sm text-slate-500 font-medium">{label}</p>
+            <p className="text-2xl font-bold text-slate-900">{value}</p>
         </div>
     </div>
 );

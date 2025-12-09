@@ -4,22 +4,22 @@
 
 @layer base {
   :root {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
   }
 
   body {
-    @apply bg-background text-white antialiased;
+    @apply bg-background text-slate-900 antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
 
 @layer utilities {
   .glass-panel {
-    @apply bg-white/10 backdrop-blur-lg border border-white/20 shadow-xl;
+    @apply bg-white/70 backdrop-blur-lg border border-slate-200 shadow-xl;
   }
 
   .glass-button {
-    @apply bg-white/20 hover:bg-white/30 backdrop-blur-md border border-white/10 transition-all duration-300;
+    @apply bg-white hover:bg-slate-50 border border-slate-200 transition-all duration-300 shadow-sm;
   }
 }

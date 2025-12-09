@@ -132,12 +132,12 @@ export default function StudentDashboard() {
             {/* Header Section */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold">Dashboard</h1>
-                    <p className="text-slate-400 mt-1">実習の進捗状況と予約管理</p>
+                    <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
+                    <p className="text-slate-500 mt-1">実習の進捗状況と予約管理</p>
                 </div>
                 <Link
                     to="/student/reservation"
-                    className="glass-button px-6 py-3 rounded-xl flex items-center gap-2 text-primary font-bold hover:bg-primary/20"
+                    className="bg-white border border-slate-200 shadow-sm px-6 py-3 rounded-xl flex items-center gap-2 text-primary font-bold hover:bg-slate-50 transition-colors"
                 >
                     <Plus className="w-5 h-5" />
                     新規予約
@@ -145,66 +145,66 @@ export default function StudentDashboard() {
             </div>
 
             {/* Progress Card */}
-            <div className="glass-panel p-8 rounded-2xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 opacity-10">
-                    <Clock className="w-32 h-32" />
+            <div className="glass-panel p-8 rounded-2xl relative overflow-hidden bg-white shadow-lg border-slate-100">
+                <div className="absolute top-0 right-0 p-4 opacity-5">
+                    <Clock className="w-32 h-32 text-slate-900" />
                 </div>
 
                 <div className="relative z-10">
                     <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-xl font-bold flex items-center gap-2">
+                        <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900">
                             <CheckCircle className="w-5 h-5 text-primary" />
                             実習進捗状況
                         </h2>
-                        <span className="px-3 py-1 rounded-full bg-white/10 text-sm font-medium">
+                        <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-sm font-medium border border-slate-200">
                             {getTrainingTypeLabel(student?.training_type)}
                         </span>
                     </div>
 
                     <div className="mb-4">
                         <div className="flex justify-between text-sm mb-2">
-                            <span className="text-slate-400">達成率</span>
-                            <span className="font-bold text-xl">{Math.round(getProgressPercent())}%</span>
+                            <span className="text-slate-500">達成率</span>
+                            <span className="font-bold text-xl text-slate-900">{Math.round(getProgressPercent())}%</span>
                         </div>
-                        <div className="h-4 bg-slate-700 rounded-full overflow-hidden">
+                        <div className="h-4 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
                             <div
-                                className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-1000 ease-out"
+                                className="h-full bg-gradient-to-r from-primary to-blue-600 transition-all duration-1000 ease-out shadow-sm"
                                 style={{ width: `${getProgressPercent()}%` }}
                             />
                         </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 mt-6">
-                        <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                            <p className="text-sm text-slate-400 mb-1">現在の累積時間</p>
-                            <p className="text-2xl font-bold text-white">{formatTime(totalMinutes)}</p>
+                        <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                            <p className="text-sm text-slate-500 mb-1">現在の累積時間</p>
+                            <p className="text-2xl font-bold text-slate-900">{formatTime(totalMinutes)}</p>
                         </div>
-                        <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                            <p className="text-sm text-slate-400 mb-1">目標時間</p>
-                            <p className="text-2xl font-bold text-slate-300">{formatTime(settings?.requiredMinutes || 1260)}</p>
+                        <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                            <p className="text-sm text-slate-500 mb-1">目標時間</p>
+                            <p className="text-2xl font-bold text-slate-700">{formatTime(settings?.requiredMinutes || 1260)}</p>
                         </div>
                     </div>
 
                     {getProgressPercent() >= 100 && (
-                        <div className="mt-6 p-4 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-200 flex items-center gap-3">
-                            <CheckCircle className="w-5 h-5" />
-                            <p>目標達成！必要な実習時間をクリアしました。</p>
+                        <div className="mt-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center gap-3">
+                            <CheckCircle className="w-5 h-5 text-emerald-500" />
+                            <p className="font-medium">目標達成！必要な実習時間をクリアしました。</p>
                         </div>
                     )}
                 </div>
             </div>
 
             {/* Reservations List */}
-            <div className="glass-panel p-8 rounded-2xl">
-                <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+            <div className="glass-panel p-8 rounded-2xl bg-white shadow-lg border-slate-100">
+                <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-slate-900">
                     <Calendar className="w-5 h-5 text-primary" />
                     予約一覧
                 </h2>
 
                 {reservations.length === 0 ? (
-                    <div className="text-center py-12 text-slate-400">
+                    <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-slate-100 dashed">
                         <p>予約がありません</p>
-                        <Link to="/student/reservation" className="text-primary hover:underline mt-2 inline-block">
+                        <Link to="/student/reservation" className="text-primary hover:underline mt-2 inline-block font-medium">
                             実習枠を予約する
                         </Link>
                     </div>
@@ -212,7 +212,7 @@ export default function StudentDashboard() {
                     <div className="overflow-x-auto">
                         <table className="w-full">
                             <thead>
-                                <tr className="text-left text-slate-400 border-b border-white/10">
+                                <tr className="text-left text-slate-500 border-b border-slate-200">
                                     <th className="pb-4 pl-4 font-medium">日付</th>
                                     <th className="pb-4 font-medium">時間</th>
                                     <th className="pb-4 font-medium">実習区分</th>
@@ -220,22 +220,24 @@ export default function StudentDashboard() {
                                     <th className="pb-4 font-medium">実習時間</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-white/5">
+                            <tbody className="divide-y divide-slate-100">
                                 {reservations.map((reservation) => (
-                                    <tr key={reservation.id} className="hover:bg-white/5 transition-colors">
-                                        <td className="py-4 pl-4">
+                                    <tr key={reservation.id} className="hover:bg-slate-50 transition-colors">
+                                        <td className="py-4 pl-4 font-medium text-slate-700">
                                             {formatDate(reservation.slot_date)}
                                         </td>
-                                        <td className="py-4">
+                                        <td className="py-4 text-slate-600">
                                             {reservation.slot_start_time && `${reservation.slot_start_time.slice(0, 5)} - ${reservation.slot_end_time.slice(0, 5)}`}
                                         </td>
                                         <td className="py-4">
-                                            {getTrainingTypeLabel(reservation.slot_training_type)}
+                                            <span className="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-sm border border-slate-200">
+                                                {getTrainingTypeLabel(reservation.slot_training_type)}
+                                            </span>
                                         </td>
                                         <td className="py-4">
                                             {getStatusBadge(reservation.status)}
                                         </td>
-                                        <td className="py-4 font-mono">
+                                        <td className="py-4 font-mono text-slate-600">
                                             {reservation.actual_minutes
                                                 ? formatTime(reservation.actual_minutes)
                                                 : '-'}
@@ -249,11 +251,11 @@ export default function StudentDashboard() {
             </div>
 
             {/* Notice */}
-            <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-200 flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+            <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 flex items-start gap-3 shadow-sm">
+                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-blue-600" />
                 <div>
-                    <strong className="block mb-1">予約の変更・キャンセルについて</strong>
-                    <p className="text-sm opacity-90">
+                    <strong className="block mb-1 font-semibold">予約の変更・キャンセルについて</strong>
+                    <p className="text-sm opacity-90 text-blue-700">
                         予約の変更・キャンセルは開始時刻の12時間前まで可能です。
                         それ以降の変更は、Teamsでご連絡ください。
                     </p>

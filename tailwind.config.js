@@ -19,8 +19,8 @@ export default {
                     DEFAULT: '#f43f5e', // Rose 500
                     foreground: '#ffffff',
                 },
-                background: '#0f172a', // Slate 900
-                surface: '#1e293b', // Slate 800
+                background: '#ffffff', // White
+                surface: '#f8fafc', // Slate 50
             },
             fontFamily: {
                 sans: ['Inter', 'sans-serif'],
