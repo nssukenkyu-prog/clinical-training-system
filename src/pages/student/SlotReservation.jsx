@@ -191,18 +191,25 @@ export default function SlotReservation() {
             };
             await addDoc(collection(db, 'reservations'), reservationData);
 
-            // Email Notification
+            // Email Notification via GAS
             if (student.email) {
                 try {
-                    await fetch('/api/send-email', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            to: student.email,
-                            subject: '【臨床実習】予約完了のお知らせ',
-                            body: `<p>${student.name} 様</p><p>以下の日程で予約を受け付けました。</p><ul><li>日時: ${slot.date} ${customStartTime} - ${customEndTime}</li><li>実習: ${slot.training_type}</li></ul><p>キャンセルはシステムから行ってください。</p>`
-                        })
-                    });
+                    const GAS_WEBHOOK_URL = import.meta.env.VITE_GAS_EMAIL_WEBHOOK_URL;
+                    if (GAS_WEBHOOK_URL) {
+                        await fetch(GAS_WEBHOOK_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            mode: 'no-cors', // GAS requires no-cors
+                            body: JSON.stringify({
+                                to: student.email,
+                                subject: '【臨床実習】予約完了のお知らせ',
+                                body: `<p>${student.name} 様</p><p>以下の日程で予約を受け付けました。</p><ul><li>日時: ${slot.date} ${customStartTime} - ${customEndTime}</li><li>実習: ${slot.training_type}</li></ul><p>キャンセルはシステムから行ってください。</p>`
+                            })
+                        });
+                        console.log('[Email] Sent via GAS webhook');
+                    } else {
+                        console.log('[Email] GAS webhook URL not configured, skipping email');
+                    }
                 } catch (e) { console.error('Email failed', e); }
             }
 
