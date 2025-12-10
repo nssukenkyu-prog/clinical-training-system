@@ -106,7 +106,7 @@ export default function StudentEntry() {
                         <label className="text-sm font-bold text-slate-700 ml-1">氏名</label>
                         <div className="relative group">
                             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                <span className="text-slate-400 font-bold text-sm group-focus-within:text-blue-500 transition-colors">笹</span>
+                                <User className="h-5 w-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                             </div>
                             <input
                                 type="text"
