@@ -95,7 +95,7 @@ export default function StudentEntry() {
                             <input
                                 type="text"
                                 className="w-full pl-11 pr-4 py-3.5 bg-[#24ca00] bg-opacity-10 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-slate-900 placeholder:text-slate-400 font-mono transition-all duration-300 hover:bg-white"
-                                placeholder="2024001"
+                                placeholder="24ca000"
                                 value={studentNumber}
                                 onChange={(e) => setStudentNumber(e.target.value)}
                                 required

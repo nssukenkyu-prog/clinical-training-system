@@ -314,7 +314,7 @@ export default function StudentManagement() {
                                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:border-primary text-slate-900 transition-colors"
                                     value={formData.studentNumber}
                                     onChange={e => setFormData({ ...formData, studentNumber: e.target.value })}
-                                    placeholder="2024001"
+                                    placeholder="24ca000"
                                     required
                                 />
                             </div>
@@ -396,7 +396,7 @@ export default function StudentManagement() {
 
                         <div className="mb-6 p-4 rounded-xl bg-blue-50 border border-blue-100 text-blue-700 text-sm">
                             <strong className="block mb-1">CSV形式:</strong> 学籍番号,メールアドレス,氏名,学年,実習区分<br />
-                            <span className="text-blue-500">例: 2024001,yamada@example.com,山田太郎,2,I</span>
+                            <span className="text-blue-500">例: 24ca000,yamada@example.com,山田太郎,2,I</span>
                         </div>
 
                         <div className="mb-6">
@@ -405,7 +405,7 @@ export default function StudentManagement() {
                                 className="w-full h-64 bg-slate-50 border border-slate-200 rounded-xl p-4 font-mono text-sm focus:outline-none focus:border-primary text-slate-900 transition-colors resize-none"
                                 value={csvData}
                                 onChange={e => setCsvData(e.target.value)}
-                                placeholder={`2024001,yamada@example.com,山田太郎,2,I\n2024002,tanaka@example.com,田中花子,2,I`}
+                                placeholder={`24ca000,yamada@example.com,山田太郎,2,I\n24ca001,tanaka@example.com,田中花子,2,I`}
                             />
                         </div>
 
