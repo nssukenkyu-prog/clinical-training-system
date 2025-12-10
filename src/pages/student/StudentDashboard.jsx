@@ -44,7 +44,8 @@ export default function StudentDashboard() {
             const qReservations = query(
                 reservationsRef,
                 where('student_id', '==', studentId),
-                orderBy('created_at', 'desc')
+                orderBy('slot_date', 'desc'),
+                orderBy('slot_start_time', 'desc')
             );
             const reservationsSnapshot = await getDocs(qReservations);
             const reservationsData = reservationsSnapshot.docs.map(doc => ({
@@ -98,7 +99,7 @@ export default function StudentDashboard() {
         };
         const labels = {
             'confirmed': '予約済',
-            'completed': '完了',
+            'completed': '承認済',
             'cancelled': 'キャンセル'
         };
         return (
@@ -176,7 +177,7 @@ export default function StudentDashboard() {
                             <p className="text-2xl font-bold text-slate-900">{formatTime(totalMinutes)}</p>
                         </div>
                         <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-                            <p className="text-sm text-slate-500 mb-1">目標時間</p>
+                            <p className="text-sm text-slate-500 mb-1">必須時間</p>
                             <p className="text-2xl font-bold text-slate-700">{formatTime(settings?.requiredMinutes || 1260)}</p>
                         </div>
                     </div>
@@ -184,7 +185,7 @@ export default function StudentDashboard() {
                     {getProgressPercent() >= 100 && (
                         <div className="mt-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center gap-3">
                             <CheckCircle className="w-5 h-5 text-emerald-500" />
-                            <p className="font-medium">目標達成！必要な実習時間をクリアしました。</p>
+                            <p className="font-medium">必須時間をクリアしました。</p>
                         </div>
                     )}
                 </div>

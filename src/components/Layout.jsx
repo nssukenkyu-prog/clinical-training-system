@@ -49,7 +49,7 @@ const Layout = ({ children, userRole, userName }) => {
             <aside className="fixed left-0 top-0 h-full w-64 bg-white/80 backdrop-blur-md border-r border-slate-200 z-20 hidden md:flex flex-col shadow-sm">
                 <div className="p-6 border-b border-slate-100">
                     <h1 className="text-xl font-bold text-primary">
-                        NSSU 2026 臨床実習
+                        臨床実習
                     </h1>
                     <p className="text-xs text-slate-500 mt-1">
                         {userRole === 'admin' ? '管理者ポータル' : '学生ポータル'}

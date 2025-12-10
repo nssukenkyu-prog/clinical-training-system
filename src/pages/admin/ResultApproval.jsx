@@ -117,6 +117,23 @@ export default function ResultApproval() {
                 loadReservations();
             }
 
+            // Email Notification
+            if (reservation.student.email) {
+                try {
+                    await fetch('/api/send-email', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            to: reservation.student.email,
+                            subject: '【臨床実習】実習承認のお知らせ',
+                            body: `<p>${reservation.student.name} 様</p><p>以下の実習が承認されました。</p><ul><li>日時: ${formatDate(reservation.slot.date)} ${reservation.slot.start_time.slice(0, 5)} - ${reservation.slot.end_time.slice(0, 5)}</li><li>実習: ${reservation.slot.training_type}</li><li>実績時間: ${Math.floor(actualMinutes / 60)}時間${actualMinutes % 60}分</li></ul>`
+                        })
+                    });
+                } catch (e) {
+                    console.error('Email failed', e);
+                }
+            }
+
             // Optional: Show success toast
         } catch (error) {
             console.error('Error approving:', error);

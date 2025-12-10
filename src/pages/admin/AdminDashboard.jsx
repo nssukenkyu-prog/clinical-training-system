@@ -187,7 +187,7 @@ export default function AdminDashboard() {
                     bg="bg-amber-50"
                 />
                 <StatCard
-                    label="完了した実習"
+                    label="承認済の実習"
                     value={stats.completedTrainings}
                     icon={CheckSquare}
                     color="text-purple-600"

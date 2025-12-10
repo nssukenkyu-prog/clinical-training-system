@@ -73,7 +73,7 @@ export default function StudentEntry() {
                     <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-500/30 mb-6 group transition-all duration-500 hover:scale-110 hover:rotate-3">
                         <LockOpen className="w-8 h-8 text-white group-hover:animate-pulse" />
                     </div>
-                    <h1 className="text-2xl font-bold text-slate-900 tracking-tight">NSSU 2026臨床実習予約システム</h1>
+                    <h1 className="text-2xl font-bold text-slate-900 tracking-tight">臨床実習</h1>
                     <p className="text-slate-500 mt-2 text-sm font-medium">学籍番号と氏名を入力して開始してください</p>
                 </div>
 
@@ -93,7 +93,7 @@ export default function StudentEntry() {
                             </div>
                             <input
                                 type="text"
-                                className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-slate-900 placeholder:text-slate-400 font-mono transition-all duration-300 hover:bg-white"
+                                className="w-full pl-11 pr-4 py-3.5 bg-[#24ca00] bg-opacity-10 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-slate-900 placeholder:text-slate-400 font-mono transition-all duration-300 hover:bg-white"
                                 placeholder="2024001"
                                 value={studentNumber}
                                 onChange={(e) => setStudentNumber(e.target.value)}
@@ -111,7 +111,7 @@ export default function StudentEntry() {
                             <input
                                 type="text"
                                 className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-slate-900 placeholder:text-slate-400 transition-all duration-300 hover:bg-white"
-                                placeholder="山田 太郎"
+                                placeholder="日体 太郎"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 required
