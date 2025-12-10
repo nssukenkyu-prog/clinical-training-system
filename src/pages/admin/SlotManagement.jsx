@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, query, where, getDocs, addDoc, deleteDoc, doc, writeBatch } from 'firebase/firestore';
-import { ChevronLeft, ChevronRight, Plus, Trash2, Calendar, Clock, Users, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Trash2, Calendar, Clock, Users, X, List, Grid } from 'lucide-react';
 import { clsx } from 'clsx';
 
 export default function SlotManagement() {
@@ -10,6 +10,7 @@ export default function SlotManagement() {
     const [selectedDate, setSelectedDate] = useState(null);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
+    const [viewMode, setViewMode] = useState('month'); // 'month' or 'day'
     const [formData, setFormData] = useState({
         startTime: '09:00',
         endTime: '12:00',
@@ -235,65 +236,174 @@ export default function SlotManagement() {
 
     return (
         <div className="space-y-8">
-            <div>
-                <h1 className="text-3xl font-bold text-slate-900">実習枠管理</h1>
-                <p className="text-slate-500 mt-1">実習枠の作成・編集・削除を行います</p>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold text-slate-900">実習枠管理</h1>
+                    <p className="text-slate-500 mt-1">実習枠の作成・編集・削除を行います</p>
+                </div>
+                <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
+                    <button
+                        onClick={() => setViewMode('month')}
+                        className={clsx(
+                            "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors",
+                            viewMode === 'month' ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"
+                        )}
+                    >
+                        <Grid className="w-4 h-4" />
+                        月表示
+                    </button>
+                    <button
+                        onClick={() => setViewMode('day')}
+                        className={clsx(
+                            "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors",
+                            viewMode === 'day' ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"
+                        )}
+                    >
+                        <List className="w-4 h-4" />
+                        日表示
+                    </button>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Calendar */}
+                {/* Calendar / Day View */}
                 <div className="lg:col-span-2 glass-panel p-6 rounded-2xl bg-white shadow-lg border-slate-100">
-                    <div className="flex items-center justify-between mb-6">
-                        <button onClick={prevMonth} className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-600">
-                            <ChevronLeft className="w-5 h-5" />
-                        </button>
-                        <h2 className="text-xl font-bold text-slate-900">
-                            {currentMonth.getFullYear()}年 {currentMonth.getMonth() + 1}月
-                        </h2>
-                        <button onClick={nextMonth} className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-600">
-                            <ChevronRight className="w-5 h-5" />
-                        </button>
-                    </div>
-
-                    <div className="grid grid-cols-7 gap-2 mb-2">
-                        {['日', '月', '火', '水', '木', '金', '土'].map(day => (
-                            <div key={day} className="text-center text-sm text-slate-500 py-2 font-medium">
-                                {day}
-                            </div>
-                        ))}
-                    </div>
-
-                    <div className="grid grid-cols-7 gap-2">
-                        {getDaysInMonth().map((date, index) => {
-                            if (!date) {
-                                return <div key={index} className="aspect-square"></div>;
-                            }
-
-                            const dateSlots = getSlotsForDate(date);
-                            const hasSlots = dateSlots.length > 0;
-                            const isSelected = selectedDate && date.toDateString() === selectedDate.toDateString();
-
-                            return (
-                                <button
-                                    key={index}
-                                    onClick={() => setSelectedDate(date)}
-                                    className={clsx(
-                                        "aspect-square rounded-xl flex flex-col items-center justify-center relative transition-all border",
-                                        isSelected ? "bg-primary text-white shadow-md border-primary scale-105" :
-                                            hasSlots ? "bg-blue-50 hover:bg-blue-100 text-slate-700 cursor-pointer border-blue-100" :
-                                                "bg-white hover:bg-slate-50 text-slate-500 border-slate-100"
-                                    )}
-                                >
-                                    <span className="text-lg font-medium">{date.getDate()}</span>
-                                    {hasSlots && !isSelected && (
-                                        <span className="text-[10px] text-blue-600 mt-1 font-bold">
-                                            {dateSlots.length}枠
-                                        </span>
-                                    )}
+                    {viewMode === 'month' ? (
+                        <>
+                            <div className="flex items-center justify-between mb-6">
+                                <button onClick={prevMonth} className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-600">
+                                    <ChevronLeft className="w-5 h-5" />
                                 </button>
-                            );
-                        })}
-                    </div>
+                                <h2 className="text-xl font-bold text-slate-900">
+                                    {currentMonth.getFullYear()}年 {currentMonth.getMonth() + 1}月
+                                </h2>
+                                <button onClick={nextMonth} className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-600">
+                                    <ChevronRight className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <div className="grid grid-cols-7 gap-2 mb-2">
+                                {['日', '月', '火', '水', '木', '金', '土'].map(day => (
+                                    <div key={day} className="text-center text-sm text-slate-500 py-2 font-medium">
+                                        {day}
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="grid grid-cols-7 gap-2">
+                                {getDaysInMonth().map((date, index) => {
+                                    if (!date) {
+                                        return <div key={index} className="aspect-square"></div>;
+                                    }
+
+                                    const dateSlots = getSlotsForDate(date);
+                                    const hasSlots = dateSlots.length > 0;
+                                    const isSelected = selectedDate && date.toDateString() === selectedDate.toDateString();
+
+                                    return (
+                                        <button
+                                            key={index}
+                                            onClick={() => setSelectedDate(date)}
+                                            className={clsx(
+                                                "aspect-square rounded-xl flex flex-col items-center justify-center relative transition-all border",
+                                                isSelected ? "bg-primary text-white shadow-md border-primary scale-105" :
+                                                    hasSlots ? "bg-blue-50 hover:bg-blue-100 text-slate-700 cursor-pointer border-blue-100" :
+                                                        "bg-white hover:bg-slate-50 text-slate-500 border-slate-100"
+                                            )}
+                                        >
+                                            <span className="text-lg font-medium">{date.getDate()}</span>
+                                            {hasSlots && !isSelected && (
+                                                <span className="text-[10px] text-blue-600 mt-1 font-bold">
+                                                    {dateSlots.length}枠
+                                                </span>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </>
+                    ) : (
+                        /* Day View - Timetable */
+                        <>
+                            <div className="flex items-center justify-between mb-6">
+                                <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                                    <Calendar className="w-5 h-5 text-primary" />
+                                    {selectedDate ? formatDate(selectedDate) : '日付を選択してください'}
+                                </h2>
+                                {selectedDate && (
+                                    <button
+                                        onClick={() => setShowModal(true)}
+                                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary/90 transition-colors shadow-md shadow-primary/20 text-sm font-bold"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                        枠を追加
+                                    </button>
+                                )}
+                            </div>
+
+                            {!selectedDate ? (
+                                <div className="text-center py-12 text-slate-400 bg-slate-50 rounded-xl border border-slate-100">
+                                    <p>左のカレンダーから日付を選択してください</p>
+                                </div>
+                            ) : selectedDateSlots.length === 0 ? (
+                                <div className="text-center py-12 text-slate-400 bg-slate-50 rounded-xl border border-slate-100">
+                                    <p>この日に枠はありません</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {selectedDateSlots.map(slot => {
+                                        const confirmed = (slot.reservations || []).length;
+                                        return (
+                                            <div key={slot.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 hover:shadow-sm transition-shadow">
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="flex items-center gap-2 text-lg font-bold text-slate-700">
+                                                            <Clock className="w-5 h-5 text-primary" />
+                                                            {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
+                                                        </div>
+                                                        <span className="text-xs font-bold px-2 py-1 rounded bg-blue-50 text-blue-600 border border-blue-100">
+                                                            {getTrainingTypeLabel(slot.training_type)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm text-slate-500 flex items-center gap-1 bg-white px-2 py-1 rounded border border-slate-200">
+                                                            <Users className="w-4 h-4" />
+                                                            {confirmed} / {slot.max_capacity}
+                                                        </span>
+                                                        <button
+                                                            onClick={() => handleDeleteSlot(slot.id)}
+                                                            disabled={confirmed > 0}
+                                                            className="p-2 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors disabled:opacity-30"
+                                                            title={confirmed > 0 ? '予約がある枠は削除できません' : '削除'}
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                {confirmed > 0 && (
+                                                    <div className="pt-3 border-t border-slate-200">
+                                                        <p className="text-xs text-slate-500 mb-2 font-medium">予約者:</p>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {(slot.reservations || []).map(r => (
+                                                                <div key={r.id} className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg bg-white text-slate-700 border border-slate-200">
+                                                                    <span className="font-medium">{r.student_name}</span>
+                                                                    {r.custom_start_time && r.custom_end_time && (
+                                                                        <span className="text-slate-400">
+                                                                            ({r.custom_start_time} - {r.custom_end_time})
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </>
+                    )}
                 </div>
 
                 {/* Selected Date Details */}
