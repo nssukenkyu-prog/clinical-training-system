@@ -68,10 +68,12 @@ export default function SlotManagement() {
                 }
             }
 
-            // 4. Merge reservations with student names
+            // 4. Merge reservations with student info (name, number, total_minutes)
             const reservationsWithNames = reservationsData.map(r => ({
                 ...r,
-                student_name: studentsMap[r.student_id]?.name || '不明'
+                student_name: studentsMap[r.student_id]?.name || '不明',
+                student_number: studentsMap[r.student_id]?.student_number || '',
+                student_total_minutes: studentsMap[r.student_id]?.total_minutes || 0
             }));
 
             // 5. Merge into slots
@@ -206,6 +208,15 @@ export default function SlotManagement() {
     const getTrainingTypeLabel = (type) => {
         const labels = { 'I': '実習Ⅰ', 'II': '実習Ⅱ', 'IV': '実習Ⅳ' };
         return labels[type] || type;
+    };
+
+    const getTrainingTypeColor = (type) => {
+        const colors = {
+            'I': 'bg-blue-100 text-blue-700 border-blue-200',
+            'II': 'bg-emerald-100 text-emerald-700 border-emerald-200',
+            'IV': 'bg-purple-100 text-purple-700 border-purple-200'
+        };
+        return colors[type] || 'bg-slate-100 text-slate-700 border-slate-200';
     };
 
     const formatDate = (date) => {
@@ -361,7 +372,7 @@ export default function SlotManagement() {
                                                             <Clock className="w-5 h-5 text-primary" />
                                                             {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
                                                         </div>
-                                                        <span className="text-xs font-bold px-2 py-1 rounded bg-blue-50 text-blue-600 border border-blue-100">
+                                                        <span className={clsx("text-xs font-bold px-2 py-1 rounded border", getTrainingTypeColor(slot.training_type))}>
                                                             {getTrainingTypeLabel(slot.training_type)}
                                                         </span>
                                                     </div>
@@ -385,11 +396,17 @@ export default function SlotManagement() {
                                                         <p className="text-xs text-slate-500 mb-2 font-medium">予約者:</p>
                                                         <div className="flex flex-wrap gap-2">
                                                             {(slot.reservations || []).map(r => (
-                                                                <div key={r.id} className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg bg-white text-slate-700 border border-slate-200">
+                                                                <div key={r.id} className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg bg-white text-slate-700 border border-slate-200">
+                                                                    <span className="font-mono text-slate-400">{r.student_number}</span>
                                                                     <span className="font-medium">{r.student_name}</span>
+                                                                    {r.student_total_minutes === 0 ? (
+                                                                        <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-bold">初日</span>
+                                                                    ) : (
+                                                                        <span className="text-slate-400 text-[10px]">({Math.floor(r.student_total_minutes / 60)}h)</span>
+                                                                    )}
                                                                     {r.custom_start_time && r.custom_end_time && (
                                                                         <span className="text-slate-400">
-                                                                            ({r.custom_start_time} - {r.custom_end_time})
+                                                                            {r.custom_start_time}-{r.custom_end_time}
                                                                         </span>
                                                                     )}
                                                                 </div>
@@ -442,7 +459,7 @@ export default function SlotManagement() {
                                                 <Clock className="w-4 h-4 text-slate-400" />
                                                 {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
                                             </div>
-                                            <span className="text-xs font-bold px-2 py-1 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                            <span className={clsx("text-xs font-bold px-2 py-1 rounded border", getTrainingTypeColor(slot.training_type))}>
                                                 {getTrainingTypeLabel(slot.training_type)}
                                             </span>
                                         </div>
@@ -468,12 +485,16 @@ export default function SlotManagement() {
                                                 <p className="text-xs text-slate-500 mb-2 font-medium">予約者:</p>
                                                 <div className="flex flex-wrap gap-2">
                                                     {(slot.reservations || []).map(r => (
-                                                        <span
+                                                        <div
                                                             key={r.id}
-                                                            className="text-xs px-2 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100"
+                                                            className="flex items-center gap-1.5 text-xs px-2 py-1 rounded bg-slate-50 text-slate-700 border border-slate-200"
                                                         >
-                                                            {r.student_name}
-                                                        </span>
+                                                            <span className="font-mono text-slate-400">{r.student_number}</span>
+                                                            <span className="font-medium">{r.student_name}</span>
+                                                            {r.student_total_minutes === 0 && (
+                                                                <span className="px-1 py-0.5 rounded bg-amber-100 text-amber-700 text-[9px] font-bold">初日</span>
+                                                            )}
+                                                        </div>
                                                     ))}
                                                 </div>
                                             </div>
@@ -487,85 +508,87 @@ export default function SlotManagement() {
             </div>
 
             {/* Create Slot Modal */}
-            {showModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setShowModal(false)}>
-                    <div className="glass-panel p-6 rounded-2xl w-full max-w-md bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-xl font-bold text-slate-900">{formatDate(selectedDate)} に枠を追加</h3>
-                            <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
-                                <X className="w-6 h-6" />
-                            </button>
+            {
+                showModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setShowModal(false)}>
+                        <div className="glass-panel p-6 rounded-2xl w-full max-w-md bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-xl font-bold text-slate-900">{formatDate(selectedDate)} に枠を追加</h3>
+                                <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleCreateSlot} className="space-y-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">実習区分</label>
+                                    <select
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:border-primary text-slate-900 transition-colors"
+                                        value={formData.trainingType}
+                                        onChange={e => setFormData({ ...formData, trainingType: e.target.value })}
+                                    >
+                                        <option value="I">臨床実習Ⅰ（2年生）</option>
+                                        <option value="II">臨床実習Ⅱ（3年生）</option>
+                                        <option value="IV">臨床実習Ⅳ（4年生）</option>
+                                    </select>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">開始時刻</label>
+                                        <input
+                                            type="time"
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:border-primary text-slate-900 transition-colors"
+                                            value={formData.startTime}
+                                            onChange={e => setFormData({ ...formData, startTime: e.target.value })}
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">終了時刻</label>
+                                        <input
+                                            type="time"
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:border-primary text-slate-900 transition-colors"
+                                            value={formData.endTime}
+                                            onChange={e => setFormData({ ...formData, endTime: e.target.value })}
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">最大人数</label>
+                                    <input
+                                        type="number"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:border-primary text-slate-900 transition-colors"
+                                        value={formData.maxCapacity}
+                                        onChange={e => setFormData({ ...formData, maxCapacity: parseInt(e.target.value) })}
+                                        min="1"
+                                        max="10"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="flex gap-3 pt-4">
+                                    <button
+                                        type="button"
+                                        className="flex-1 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors font-medium"
+                                        onClick={handleBulkCreate}
+                                    >
+                                        一括作成
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="flex-1 px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 font-bold"
+                                    >
+                                        作成
+                                    </button>
+                                </div>
+                            </form>
                         </div>
-
-                        <form onSubmit={handleCreateSlot} className="space-y-6">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">実習区分</label>
-                                <select
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:border-primary text-slate-900 transition-colors"
-                                    value={formData.trainingType}
-                                    onChange={e => setFormData({ ...formData, trainingType: e.target.value })}
-                                >
-                                    <option value="I">臨床実習Ⅰ（2年生）</option>
-                                    <option value="II">臨床実習Ⅱ（3年生）</option>
-                                    <option value="IV">臨床実習Ⅳ（4年生）</option>
-                                </select>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-2">開始時刻</label>
-                                    <input
-                                        type="time"
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:border-primary text-slate-900 transition-colors"
-                                        value={formData.startTime}
-                                        onChange={e => setFormData({ ...formData, startTime: e.target.value })}
-                                        required
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-2">終了時刻</label>
-                                    <input
-                                        type="time"
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:border-primary text-slate-900 transition-colors"
-                                        value={formData.endTime}
-                                        onChange={e => setFormData({ ...formData, endTime: e.target.value })}
-                                        required
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">最大人数</label>
-                                <input
-                                    type="number"
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:border-primary text-slate-900 transition-colors"
-                                    value={formData.maxCapacity}
-                                    onChange={e => setFormData({ ...formData, maxCapacity: parseInt(e.target.value) })}
-                                    min="1"
-                                    max="10"
-                                    required
-                                />
-                            </div>
-
-                            <div className="flex gap-3 pt-4">
-                                <button
-                                    type="button"
-                                    className="flex-1 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors font-medium"
-                                    onClick={handleBulkCreate}
-                                >
-                                    一括作成
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="flex-1 px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 font-bold"
-                                >
-                                    作成
-                                </button>
-                            </div>
-                        </form>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 }

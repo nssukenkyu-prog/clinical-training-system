@@ -238,26 +238,33 @@ export default function SlotReservation() {
             await addDoc(collection(db, 'reservations'), reservationData);
 
             // Send confirmation email via Cloudflare Worker
-            try {
-                await fetch('/api/send-email', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        to: student.email,
-                        subject: '【臨床実習】予約完了のお知らせ',
-                        body: `
-                            <p>${student.name} 様</p>
-                            <p>以下の日程で予約を受け付けました。</p>
-                            <ul>
-                                <li>日時: ${slot.date} ${customStartTime} - ${customEndTime}</li>
-                                <li>実習: ${slot.training_type}</li>
-                            </ul>
-                            <p>キャンセルはシステムから行ってください。</p>
-                        `
-                    })
-                });
-            } catch (emailError) {
-                console.error('Failed to send email:', emailError);
+            if (student.email) {
+                try {
+                    console.log('[Email] Sending to:', student.email);
+                    const emailResponse = await fetch('/api/send-email', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            to: student.email,
+                            subject: '【臨床実習】予約完了のお知らせ',
+                            body: `
+                                <p>${student.name} 様</p>
+                                <p>以下の日程で予約を受け付けました。</p>
+                                <ul>
+                                    <li>日時: ${slot.date} ${customStartTime} - ${customEndTime}</li>
+                                    <li>実習: ${slot.training_type}</li>
+                                </ul>
+                                <p>キャンセルはシステムから行ってください。</p>
+                            `
+                        })
+                    });
+                    const emailResult = await emailResponse.json();
+                    console.log('[Email] Response:', emailResult);
+                } catch (emailError) {
+                    console.error('[Email] Failed to send:', emailError);
+                }
+            } else {
+                console.log('[Email] Skipped - no email address for student');
             }
 
             alert('予約が完了しました');
