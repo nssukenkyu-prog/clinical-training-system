@@ -21,33 +21,33 @@ export default function AdminDashboard() {
 
     const loadData = async () => {
         try {
-            const today = new Date().toISOString().split('T')[0];
+            // Fix: Use local date for todayStr to match JST
+            const today = new Date();
+            const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-            // 今日の予約数
+            // 1. Today's Reservations
             const reservationsRef = collection(db, 'reservations');
-            const qTodayReservations = query(
+            const qToday = query(
                 reservationsRef,
-                where('status', '==', 'confirmed'),
-                where('created_at', '>=', today) // Note: This compares ISO string, might need adjustment if created_at includes time. 
-                // Actually, 'created_at' usually includes time. Comparing string '2023-10-27' with '2023-10-27T...' works lexicographically.
-                // But better to be safe.
+                where('slot_date', '==', todayStr),
+                where('status', '==', 'confirmed')
             );
-            const todayReservationsSnapshot = await getCountFromServer(qTodayReservations);
+            const todaySnapshot = await getCountFromServer(qToday);
 
-            // 学生総数
+            // 2. Total Students
             const studentsRef = collection(db, 'students');
             const studentsSnapshot = await getCountFromServer(studentsRef);
 
-            // 有効な実習枠数
+            // 3. Active Slots (Future slots)
             const slotsRef = collection(db, 'slots');
             const qActiveSlots = query(
                 slotsRef,
-                where('is_active', '==', true),
-                where('date', '>=', today)
+                where('date', '>=', todayStr),
+                where('is_active', '==', true)
             );
             const activeSlotsSnapshot = await getCountFromServer(qActiveSlots);
 
-            // 完了した実習数
+            // 4. Approved Trainings (using 'completed' status internally)
             const qCompleted = query(
                 reservationsRef,
                 where('status', '==', 'completed')
@@ -55,7 +55,7 @@ export default function AdminDashboard() {
             const completedSnapshot = await getCountFromServer(qCompleted);
 
             setStats({
-                todayReservations: todayReservationsSnapshot.data().count,
+                todayReservations: todaySnapshot.data().count,
                 totalStudents: studentsSnapshot.data().count,
                 activeSlots: activeSlotsSnapshot.data().count,
                 completedTrainings: completedSnapshot.data().count
@@ -64,7 +64,7 @@ export default function AdminDashboard() {
             // 今日の枠一覧
             const qTodaySlots = query(
                 slotsRef,
-                where('date', '==', today),
+                where('date', '==', todayStr),
                 where('is_active', '==', true),
                 orderBy('start_time')
             );
@@ -75,7 +75,7 @@ export default function AdminDashboard() {
             // Using denormalized slot_date
             const qTodaySlotReservations = query(
                 reservationsRef,
-                where('slot_date', '==', today),
+                where('slot_date', '==', todayStr),
                 where('status', '==', 'confirmed')
             );
             const todaySlotReservationsSnapshot = await getDocs(qTodaySlotReservations);
@@ -157,10 +157,10 @@ export default function AdminDashboard() {
     }
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-8 pt-6">
             <div>
-                <h1 className="text-3xl font-bold text-slate-900">管理者ダッシュボード</h1>
-                <p className="text-slate-500 mt-1">システム全体の状況を確認できます</p>
+                <h1 className="text-3xl font-bold text-slate-900 tracking-tight">管理者ダッシュボード</h1>
+                <p className="text-slate-500 mt-2">システム全体の状況を確認できます</p>
             </div>
 
             {/* Stats Grid */}
@@ -182,7 +182,7 @@ export default function AdminDashboard() {
                 <StatCard
                     label="有効な実習枠"
                     value={stats.activeSlots}
-                    icon={Activity}
+                    icon={Clock}
                     color="text-amber-600"
                     bg="bg-amber-50"
                 />
@@ -298,13 +298,13 @@ export default function AdminDashboard() {
 }
 
 const StatCard = ({ label, value, icon: Icon, color, bg }) => (
-    <div className="bg-white p-6 rounded-2xl flex items-center gap-4 shadow-sm border border-slate-100">
-        <div className={`p-3 rounded-xl ${bg} ${color} border border-slate-200`}>
-            <Icon className="w-6 h-6" />
+    <div className="bg-white p-6 rounded-2xl flex items-center gap-5 shadow-sm border border-slate-100 hover:shadow-md transition-all duration-300">
+        <div className={`p-4 rounded-xl ${bg} ${color}`}>
+            <Icon className="w-8 h-8" />
         </div>
         <div>
-            <p className="text-sm text-slate-500 font-medium">{label}</p>
-            <p className="text-2xl font-bold text-slate-900">{value}</p>
+            <p className="text-sm text-slate-500 font-bold mb-1">{label}</p>
+            <p className="text-3xl font-bold text-slate-900">{value}</p>
         </div>
     </div>
 );
