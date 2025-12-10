@@ -73,7 +73,7 @@ export default function StudentEntry() {
                     <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-500/30 mb-6 group transition-all duration-500 hover:scale-110 hover:rotate-3">
                         <LockOpen className="w-8 h-8 text-white group-hover:animate-pulse" />
                     </div>
-                    <h1 className="text-2xl font-bold text-slate-900 tracking-tight">臨床実習システム</h1>
+                    <h1 className="text-2xl font-bold text-slate-900 tracking-tight">NSSU 2026臨床実習予約システム</h1>
                     <p className="text-slate-500 mt-2 text-sm font-medium">学籍番号と氏名を入力して開始してください</p>
                 </div>
 

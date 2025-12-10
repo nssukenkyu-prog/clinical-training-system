@@ -56,25 +56,43 @@ export default function SlotManagement() {
             // 3. Fetch Student names for reservations
             const studentIds = [...new Set(reservationsData.map(r => r.student_id))];
             let studentsMap = {};
+            let completedCountMap = {}; // 完了済み予約のカウント
+
             if (studentIds.length > 0) {
                 const studentsRef = collection(db, 'students');
+                const reservationsRef = collection(db, 'reservations');
+
                 // Chunk for 'in' query (max 10)
                 for (let i = 0; i < studentIds.length; i += 10) {
                     const chunk = studentIds.slice(i, i + 10);
+
+                    // 学生情報の取得
                     const qStudents = query(studentsRef, where('__name__', 'in', chunk));
                     const studentsSnapshot = await getDocs(qStudents);
                     studentsSnapshot.forEach(doc => {
                         studentsMap[doc.id] = doc.data();
                     });
+
+                    // 完了済み予約のカウント取得
+                    const qCompleted = query(
+                        reservationsRef,
+                        where('student_id', 'in', chunk),
+                        where('status', '==', 'completed')
+                    );
+                    const completedSnapshot = await getDocs(qCompleted);
+                    completedSnapshot.forEach(doc => {
+                        const data = doc.data();
+                        completedCountMap[data.student_id] = (completedCountMap[data.student_id] || 0) + 1;
+                    });
                 }
             }
 
-            // 4. Merge reservations with student info (name, number, total_minutes)
+            // 4. Merge reservations with student info (name, number, completed count)
             const reservationsWithNames = reservationsData.map(r => ({
                 ...r,
                 student_name: studentsMap[r.student_id]?.name || '不明',
                 student_number: studentsMap[r.student_id]?.student_number || '',
-                student_total_minutes: studentsMap[r.student_id]?.total_minutes || 0
+                is_first_day: (completedCountMap[r.student_id] || 0) === 0 // 完了済み予約が0件なら初日
             }));
 
             // 5. Merge into slots
@@ -417,11 +435,9 @@ export default function SlotManagement() {
                                                                 <div key={r.id} className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg bg-white text-slate-700 border border-slate-200">
                                                                     <span className="font-mono text-slate-400">{r.student_number}</span>
                                                                     <span className="font-medium">{r.student_name}</span>
-                                                                    {r.student_total_minutes === 0 ? (
+                                                                    {r.is_first_day ? (
                                                                         <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-bold">初日</span>
-                                                                    ) : (
-                                                                        <span className="text-slate-400 text-[10px]">({Math.floor(r.student_total_minutes / 60)}h)</span>
-                                                                    )}
+                                                                    ) : null}
                                                                     {r.custom_start_time && r.custom_end_time && (
                                                                         <span className="text-slate-400">
                                                                             {r.custom_start_time}-{r.custom_end_time}
@@ -509,7 +525,7 @@ export default function SlotManagement() {
                                                         >
                                                             <span className="font-mono text-slate-400">{r.student_number}</span>
                                                             <span className="font-medium">{r.student_name}</span>
-                                                            {r.student_total_minutes === 0 && (
+                                                            {r.is_first_day && (
                                                                 <span className="px-1 py-0.5 rounded bg-amber-100 text-amber-700 text-[9px] font-bold">初日</span>
                                                             )}
                                                         </div>
