@@ -73,26 +73,26 @@ export default function SlotManagement() {
                         studentsMap[doc.id] = doc.data();
                     });
 
-                    // 完了済み予約のカウント取得
-                    const qCompleted = query(
+                    // その学生の以前の予約件数を取得（全ステータス）
+                    const qPreviousReservations = query(
                         reservationsRef,
-                        where('student_id', 'in', chunk),
-                        where('status', '==', 'completed')
+                        where('student_id', 'in', chunk)
                     );
-                    const completedSnapshot = await getDocs(qCompleted);
-                    completedSnapshot.forEach(doc => {
+                    const previousSnapshot = await getDocs(qPreviousReservations);
+                    previousSnapshot.forEach(doc => {
                         const data = doc.data();
                         completedCountMap[data.student_id] = (completedCountMap[data.student_id] || 0) + 1;
                     });
                 }
             }
 
-            // 4. Merge reservations with student info (name, number, completed count)
+            // 4. Merge reservations with student info (name, number, previous reservation count)
             const reservationsWithNames = reservationsData.map(r => ({
                 ...r,
                 student_name: studentsMap[r.student_id]?.name || '不明',
                 student_number: studentsMap[r.student_id]?.student_number || '',
-                is_first_day: (completedCountMap[r.student_id] || 0) === 0 // 完了済み予約が0件なら初日
+                // その学生の予約がこの1件のみ（他に予約がない）なら初日
+                is_first_day: (completedCountMap[r.student_id] || 0) <= 1
             }));
 
             // 5. Merge into slots
