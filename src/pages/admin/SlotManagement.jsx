@@ -42,16 +42,18 @@ export default function SlotManagement() {
             const slotsSnapshot = await getDocs(qSlots);
             const slotsData = slotsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-            // 2. Fetch Reservations for this month
+            // 2. Fetch Reservations for this month (all statuses except cancelled)
             const reservationsRef = collection(db, 'reservations');
             const qReservations = query(
                 reservationsRef,
                 where('slot_date', '>=', startDate),
-                where('slot_date', '<=', endDate),
-                where('status', '==', 'confirmed')
+                where('slot_date', '<=', endDate)
             );
             const reservationsSnapshot = await getDocs(qReservations);
-            const reservationsData = reservationsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            // Filter out cancelled reservations
+            const reservationsData = reservationsSnapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data() }))
+                .filter(r => r.status !== 'cancelled');
 
             // 3. Fetch Student names for reservations
             const studentIds = [...new Set(reservationsData.map(r => r.student_id))];
@@ -238,6 +240,17 @@ export default function SlotManagement() {
             'IV': 'bg-purple-100 text-purple-700 border-purple-200'
         };
         return colors[type] || 'bg-slate-100 text-slate-700 border-slate-200';
+    };
+
+    const getStatusBadge = (status) => {
+        switch (status) {
+            case 'confirmed':
+                return { label: '予約済', color: 'bg-yellow-100 text-yellow-700 border-yellow-200' };
+            case 'completed':
+                return { label: '完了', color: 'bg-green-100 text-green-700 border-green-200' };
+            default:
+                return { label: status, color: 'bg-slate-100 text-slate-600 border-slate-200' };
+        }
     };
 
     const formatDate = (date) => {
@@ -432,9 +445,12 @@ export default function SlotManagement() {
                                                         <p className="text-xs text-slate-500 mb-2 font-medium">予約者:</p>
                                                         <div className="flex flex-wrap gap-2">
                                                             {(slot.reservations || []).map(r => (
-                                                                <div key={r.id} className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg bg-white text-slate-700 border border-slate-200">
+                                                                <div key={r.id} className={clsx(
+                                                                    "flex items-center gap-2 text-xs px-3 py-2 rounded-lg border",
+                                                                    r.status === 'completed' ? "bg-green-50 border-green-200" : "bg-white border-slate-200"
+                                                                )}>
                                                                     <span className="font-mono text-slate-400">{r.student_number}</span>
-                                                                    <span className="font-medium">{r.student_name}</span>
+                                                                    <span className="font-medium text-slate-700">{r.student_name}</span>
                                                                     {r.is_first_day ? (
                                                                         <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-bold">初日</span>
                                                                     ) : null}
@@ -443,6 +459,9 @@ export default function SlotManagement() {
                                                                             {r.custom_start_time}-{r.custom_end_time}
                                                                         </span>
                                                                     )}
+                                                                    <span className={clsx("px-1.5 py-0.5 rounded text-[10px] font-bold border", getStatusBadge(r.status).color)}>
+                                                                        {getStatusBadge(r.status).label}
+                                                                    </span>
                                                                 </div>
                                                             ))}
                                                         </div>
@@ -521,13 +540,19 @@ export default function SlotManagement() {
                                                     {(slot.reservations || []).map(r => (
                                                         <div
                                                             key={r.id}
-                                                            className="flex items-center gap-1.5 text-xs px-2 py-1 rounded bg-slate-50 text-slate-700 border border-slate-200"
+                                                            className={clsx(
+                                                                "flex items-center gap-1.5 text-xs px-2 py-1 rounded border",
+                                                                r.status === 'completed' ? "bg-green-50 border-green-200" : "bg-slate-50 border-slate-200"
+                                                            )}
                                                         >
                                                             <span className="font-mono text-slate-400">{r.student_number}</span>
-                                                            <span className="font-medium">{r.student_name}</span>
+                                                            <span className="font-medium text-slate-700">{r.student_name}</span>
                                                             {r.is_first_day && (
                                                                 <span className="px-1 py-0.5 rounded bg-amber-100 text-amber-700 text-[9px] font-bold">初日</span>
                                                             )}
+                                                            <span className={clsx("px-1 py-0.5 rounded text-[9px] font-bold border", getStatusBadge(r.status).color)}>
+                                                                {getStatusBadge(r.status).label}
+                                                            </span>
                                                         </div>
                                                     ))}
                                                 </div>
