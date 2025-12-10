@@ -27,39 +27,12 @@ function App() {
   const [userRole, setUserRole] = useState(null); // 'student' | 'admin'
   const [userName, setUserName] = useState('');
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
-        await checkUserRole(currentUser.uid);
-      } else {
-        setUser(null);
-        setUserRole(null);
-        setUserName('');
-      }
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  const checkUserRole = async (userId) => {
-    // Check Admin
-    const adminsRef = collection(db, 'admins');
-    const qAdmin = query(adminsRef, where('auth_user_id', '==', userId)); // Assuming we keep auth_user_id or use doc ID
-    // Note: For migration, we might want to check by email if auth_user_id doesn't match Firebase UID yet, 
-    // but let's assume we are setting up fresh or migrating IDs. 
-    // For a fresh start with Firebase, we can query by email or ID.
-    // Let's query by email as a fallback or primary if ID not found? 
-    // Actually, best practice is to store the Firebase UID in the user document.
-    // Since we are migrating, let's assume the user document has a field 'uid' or we query by email.
-    // Let's stick to the plan: query 'admins' collection where 'email' matches (if we use email as link) or 'uid'.
-    // The previous code used 'auth_user_id'. Let's try to find a document where 'email' matches the current user's email.
-
+  const checkUserRole = async () => {
     const currentUser = auth.currentUser;
     if (!currentUser) return;
 
-    // Check Admin by email (simpler for initial setup)
+    // Check Admin by email
+    const adminsRef = collection(db, 'admins');
     const qAdminEmail = query(adminsRef, where('email', '==', currentUser.email));
     const adminSnapshot = await getDocs(qAdminEmail);
 
@@ -81,6 +54,22 @@ function App() {
       setUserName(studentData.name || 'Student');
     }
   };
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
+        await checkUserRole();
+      } else {
+        setUser(null);
+        setUserRole(null);
+        setUserName('');
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   if (loading) {
     return (
