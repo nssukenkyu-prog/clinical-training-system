@@ -24,57 +24,72 @@ import './index.css';
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [checkingRole, setCheckingRole] = useState(true);
   const [userRole, setUserRole] = useState(null); // 'student' | 'admin'
   const [userName, setUserName] = useState('');
 
-  const checkUserRole = async () => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) return;
-
-    // Check Admin by email
-    const adminsRef = collection(db, 'admins');
-    const qAdminEmail = query(adminsRef, where('email', '==', currentUser.email));
-    const adminSnapshot = await getDocs(qAdminEmail);
-
-    if (!adminSnapshot.empty) {
-      const adminData = adminSnapshot.docs[0].data();
-      setUserRole('admin');
-      setUserName(adminData.name || 'Admin');
+  const checkUserRole = async (currentUser) => {
+    if (!currentUser) {
+      setUserRole(null);
+      setUserName('');
+      setCheckingRole(false);
       return;
     }
 
-    // Check Student by email
-    const studentsRef = collection(db, 'students');
-    const qStudentEmail = query(studentsRef, where('email', '==', currentUser.email));
-    const studentSnapshot = await getDocs(qStudentEmail);
+    try {
+      setCheckingRole(true);
+      // Check Admin by email
+      const adminsRef = collection(db, 'admins');
+      const qAdminEmail = query(adminsRef, where('email', '==', currentUser.email));
+      const adminSnapshot = await getDocs(qAdminEmail);
 
-    if (!studentSnapshot.empty) {
-      const studentData = studentSnapshot.docs[0].data();
-      setUserRole('student');
-      setUserName(studentData.name || 'Student');
+      if (!adminSnapshot.empty) {
+        const adminData = adminSnapshot.docs[0].data();
+        setUserRole('admin');
+        setUserName(adminData.name || 'Admin');
+      } else {
+        // Check Student by email
+        const studentsRef = collection(db, 'students');
+        const qStudentEmail = query(studentsRef, where('email', '==', currentUser.email));
+        const studentSnapshot = await getDocs(qStudentEmail);
+
+        if (!studentSnapshot.empty) {
+          const studentData = studentSnapshot.docs[0].data();
+          setUserRole('student');
+          setUserName(studentData.name || 'Student');
+        } else {
+          setUserRole(null); // Unknown user
+        }
+      }
+    } catch (error) {
+      console.error("Failed to check user role:", error);
+    } finally {
+      setCheckingRole(false);
     }
   };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      setLoading(false); // Auth init complete
+
       if (currentUser) {
-        setUser(currentUser);
-        await checkUserRole();
+        await checkUserRole(currentUser);
       } else {
-        setUser(null);
-        setUserRole(null);
-        setUserName('');
+        setCheckingRole(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
-  if (loading) {
+  if (loading || checkingRole) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-slate-500 text-sm font-medium animate-pulse">読み込み中...</p>
+        </div>
       </div>
     );
   }
