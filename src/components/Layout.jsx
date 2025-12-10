@@ -46,13 +46,13 @@ const Layout = ({ children, userRole, userName }) => {
             </div>
 
             {/* Sidebar (Desktop) */}
-            <aside className="fixed left-0 top-0 h-full w-64 bg-white/80 backdrop-blur-md border-r border-slate-200 z-20 hidden md:flex flex-col shadow-sm">
-                <div className="p-6 border-b border-slate-100">
-                    <h1 className="text-lg font-bold text-primary leading-tight">
+            <aside className="fixed left-0 top-0 h-full w-64 bg-gradient-to-b from-slate-50 to-white backdrop-blur-xl border-r border-slate-200/50 z-20 hidden md:flex flex-col shadow-xl">
+                <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700">
+                    <h1 className="text-lg font-bold text-white leading-tight drop-shadow-sm">
                         NSSU 令和8年度<br />臨床実習
                     </h1>
-                    <p className="text-xs text-slate-500 mt-1">
-                        {userRole === 'admin' ? '管理者ポータル' : '学生ポータル'}
+                    <p className="text-xs text-indigo-200 mt-1 font-medium">
+                        {userRole === 'admin' ? '👤 管理者ポータル' : '🎓 学生ポータル'}
                     </p>
                 </div>
 
