@@ -203,7 +203,74 @@ export default function SlotReservation() {
                             body: JSON.stringify({
                                 to: student.email,
                                 subject: '【臨床実習】予約完了のお知らせ',
-                                body: `<p>${student.name} 様</p><p>以下の日程で予約を受け付けました。</p><ul><li>日時: ${slot.date} ${customStartTime} - ${customEndTime}</li><li>実習: ${slot.training_type}</li></ul><p>キャンセルはシステムから行ってください。</p>`
+                                body: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f5f7fa;">
+  <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border-radius: 16px 16px 0 0; padding: 32px; text-align: center;">
+      <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 700;">NSSU 臨床実習予約システム</h1>
+      <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px;">予約完了のお知らせ</p>
+    </div>
+    
+    <!-- Content -->
+    <div style="background: white; padding: 32px; border-radius: 0 0 16px 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+      <p style="color: #1e293b; font-size: 16px; margin: 0 0 24px 0;">
+        <strong>${student.name}</strong> 様
+      </p>
+      
+      <p style="color: #64748b; font-size: 14px; margin: 0 0 24px 0; line-height: 1.6;">
+        以下の日程で実習予約を受け付けました。
+      </p>
+      
+      <!-- Reservation Details Card -->
+      <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-radius: 12px; padding: 24px; margin-bottom: 24px; border-left: 4px solid #6366f1;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 8px 0; color: #64748b; font-size: 13px; width: 80px;">📅 日付</td>
+            <td style="padding: 8px 0; color: #1e293b; font-size: 15px; font-weight: 600;">${slot.date}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #64748b; font-size: 13px;">⏰ 時間</td>
+            <td style="padding: 8px 0; color: #1e293b; font-size: 15px; font-weight: 600;">${customStartTime} - ${customEndTime}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #64748b; font-size: 13px;">📋 区分</td>
+            <td style="padding: 8px 0; color: #1e293b; font-size: 15px; font-weight: 600;">臨床実習 ${slot.training_type}</td>
+          </tr>
+        </table>
+      </div>
+      
+      <!-- Notice -->
+      <div style="background: #fef3c7; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+        <p style="color: #92400e; font-size: 13px; margin: 0; line-height: 1.5;">
+          ⚠️ キャンセルや変更はシステムから行ってください。<br>
+          当日欠席の場合は、必ず事前にご連絡ください。
+        </p>
+      </div>
+      
+      <!-- Footer -->
+      <div style="border-top: 1px solid #e2e8f0; padding-top: 24px; text-align: center;">
+        <p style="color: #94a3b8; font-size: 12px; margin: 0;">
+          このメールは自動送信されています。<br>
+          ご不明な点がございましたら、担当者までお問い合わせください。
+        </p>
+      </div>
+    </div>
+    
+    <!-- Branding -->
+    <p style="text-align: center; color: #94a3b8; font-size: 11px; margin-top: 24px;">
+      © ${new Date().getFullYear()} NSSU 臨床実習予約システム
+    </p>
+  </div>
+</body>
+</html>
+                                `
                             })
                         });
                         console.log('[Email] Sent via GAS webhook');
