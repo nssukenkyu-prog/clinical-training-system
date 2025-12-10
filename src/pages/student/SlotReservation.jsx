@@ -462,43 +462,91 @@ export default function SlotReservation() {
     );
 }
 
-const SlotCard = ({ slot, availability, reserved, onReserve, onCancel, reserving }) => (
-    <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all">
-        <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-slate-50 text-slate-600">
-                    <Clock className="w-5 h-5" />
+const SlotCard = ({ slot, availability, reserved, onReserve, onCancel, reserving }) => {
+    const getTrainingTypeColor = (type) => {
+        const colors = {
+            'I': 'bg-blue-100 text-blue-700 border-blue-200',
+            'II': 'bg-emerald-100 text-emerald-700 border-emerald-200',
+            'IV': 'bg-purple-100 text-purple-700 border-purple-200'
+        };
+        return colors[type] || 'bg-slate-100 text-slate-600 border-slate-200';
+    };
+
+    const getTrainingTypeLabel = (type) => {
+        const labels = { 'I': '実習Ⅰ', 'II': '実習Ⅱ', 'IV': '実習Ⅳ' };
+        return labels[type] || type;
+    };
+
+    return (
+        <div className={clsx(
+            "p-5 rounded-2xl border-2 shadow-sm hover:shadow-lg transition-all duration-300",
+            reserved
+                ? "bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-300"
+                : "bg-white border-slate-200 hover:border-indigo-300"
+        )}>
+            {/* Header with time and training type */}
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                    <div className={clsx(
+                        "p-2.5 rounded-xl",
+                        reserved ? "bg-blue-100 text-blue-600" : "bg-slate-100 text-slate-600"
+                    )}>
+                        <Clock className="w-5 h-5" />
+                    </div>
+                    <div>
+                        <span className="block text-xl font-bold text-slate-900 leading-none mb-1">
+                            {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
+                        </span>
+                        <span className={clsx(
+                            "text-xs font-bold px-2 py-0.5 rounded-full border",
+                            getTrainingTypeColor(slot.training_type)
+                        )}>
+                            {getTrainingTypeLabel(slot.training_type)}
+                        </span>
+                    </div>
                 </div>
-                <div>
-                    <span className="block text-lg font-bold text-slate-900 leading-none mb-1">
-                        {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
-                    </span>
-                    <span className="text-xs text-slate-500 font-medium">実習時間</span>
-                </div>
+                <span className={clsx("text-xs font-bold px-3 py-1.5 rounded-full border", availability.color)}>
+                    {availability.label}
+                </span>
             </div>
-            <span className={clsx("text-xs font-bold px-3 py-1.5 rounded-full border", availability.color)}>
-                {availability.label}
-            </span>
-        </div>
 
-        <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-            <span className="text-sm text-slate-500 font-medium">
-                残り <span className="text-slate-900 text-base">{availability.remaining}</span> 枠
-            </span>
+            {/* Footer with remaining slots and action */}
+            <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                <div className="flex items-center gap-2">
+                    <span className="text-sm text-slate-500">残り</span>
+                    <span className={clsx(
+                        "text-lg font-bold",
+                        availability.remaining > 2 ? "text-emerald-600" : availability.remaining > 0 ? "text-amber-600" : "text-slate-400"
+                    )}>
+                        {availability.remaining}
+                    </span>
+                    <span className="text-sm text-slate-500">枠</span>
+                </div>
 
-            {reserved ? (
-                <button onClick={onCancel} className="px-5 py-2.5 rounded-lg bg-rose-50 text-rose-600 text-sm font-bold border border-rose-100 hover:bg-rose-100 transition-colors">
-                    キャンセル
-                </button>
-            ) : availability.remaining > 0 ? (
-                <button onClick={onReserve} disabled={reserving} className="px-5 py-2.5 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-colors shadow-md shadow-primary/20">
-                    {reserving ? '処理中...' : '予約する'}
-                </button>
-            ) : (
-                <button disabled className="px-5 py-2.5 rounded-lg bg-slate-100 text-slate-400 text-sm font-bold border border-slate-200 cursor-not-allowed">
-                    満員
-                </button>
-            )}
+                {reserved ? (
+                    <button
+                        onClick={onCancel}
+                        className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-pink-500 text-white text-sm font-bold shadow-md shadow-rose-500/20 hover:shadow-rose-500/40 transition-all hover:-translate-y-0.5"
+                    >
+                        キャンセル
+                    </button>
+                ) : availability.remaining > 0 ? (
+                    <button
+                        onClick={onReserve}
+                        disabled={reserving}
+                        className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-sm font-bold shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/40 transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
+                    >
+                        {reserving ? '処理中...' : '予約する'}
+                    </button>
+                ) : (
+                    <button
+                        disabled
+                        className="px-5 py-2.5 rounded-xl bg-slate-100 text-slate-400 text-sm font-bold border border-slate-200 cursor-not-allowed"
+                    >
+                        満員
+                    </button>
+                )}
+            </div>
         </div>
-    </div>
-);
+    );
+};

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { db } from '../../lib/firebase';
-import { collection, query, where, getDocs, getCountFromServer, orderBy } from 'firebase/firestore';
-import { Users, Calendar, CheckSquare, Clock, ArrowRight, Activity } from 'lucide-react';
+import { collection, query, where, getDocs, getCountFromServer } from 'firebase/firestore';
+import { Users, Calendar, CheckSquare, Clock, ArrowRight, Activity, Download } from 'lucide-react';
 import { clsx } from 'clsx';
 
 export default function AdminDashboard() {
@@ -148,6 +148,51 @@ export default function AdminDashboard() {
         return labels[type] || type;
     };
 
+    const exportToCSV = async () => {
+        try {
+            // Fetch all reservations
+            const reservationsRef = collection(db, 'reservations');
+            const reservationsSnapshot = await getDocs(reservationsRef);
+            const reservations = reservationsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+            // Fetch all students for name lookup
+            const studentsRef = collection(db, 'students');
+            const studentsSnapshot = await getDocs(studentsRef);
+            const studentsMap = {};
+            studentsSnapshot.docs.forEach(doc => {
+                studentsMap[doc.id] = doc.data();
+            });
+
+            // Create CSV content
+            const headers = ['学籍番号', '氏名', '日付', '開始時間', '終了時間', '実習区分', 'ステータス', '実績時間(分)'];
+            const rows = reservations.map(r => {
+                const student = studentsMap[r.student_id] || {};
+                return [
+                    student.student_number || '',
+                    student.name || '',
+                    r.slot_date || '',
+                    r.custom_start_time || r.slot_start_time || '',
+                    r.custom_end_time || r.slot_end_time || '',
+                    r.slot_training_type || '',
+                    r.status || '',
+                    r.actual_minutes || ''
+                ].join(',');
+            });
+
+            const csv = [headers.join(','), ...rows].join('\n');
+            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' }); // BOM for Excel
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `reservations_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Export error:', error);
+            alert('エクスポートに失敗しました');
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -158,9 +203,18 @@ export default function AdminDashboard() {
 
     return (
         <div className="space-y-8 pt-6">
-            <div>
-                <h1 className="text-3xl font-bold text-slate-900 tracking-tight">管理者ダッシュボード</h1>
-                <p className="text-slate-500 mt-2">システム全体の状況を確認できます</p>
+            <div className="flex justify-between items-start">
+                <div>
+                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">管理者ダッシュボード</h1>
+                    <p className="text-slate-500 mt-2">システム全体の状況を確認できます</p>
+                </div>
+                <button
+                    onClick={exportToCSV}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all hover:-translate-y-0.5"
+                >
+                    <Download className="w-4 h-4" />
+                    CSVエクスポート
+                </button>
             </div>
 
             {/* Stats Grid */}
