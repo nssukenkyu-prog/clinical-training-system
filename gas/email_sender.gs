@@ -25,11 +25,15 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
     
+    // 送信者名の設定
+    const SENDER_NAME = 'NSSU 臨床実習予約システム';
+    
     // メール送信
     MailApp.sendEmail({
       to: to,
       subject: subject,
-      htmlBody: body
+      htmlBody: body,
+      name: SENDER_NAME  // 送信者名を設定
     });
     
     // ログ記録
