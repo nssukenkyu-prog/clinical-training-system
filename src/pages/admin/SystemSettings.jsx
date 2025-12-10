@@ -80,7 +80,7 @@ export default function SystemSettings() {
     }
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-8 pt-10">
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900">システム設定</h1>

@@ -185,7 +185,7 @@ export default function StudentManagement() {
     const filteredStudents = getFilteredStudents();
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-8 pt-10">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900">学生管理</h1>

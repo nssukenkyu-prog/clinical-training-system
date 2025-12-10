@@ -21,9 +21,12 @@ export default function AdminDashboard() {
 
     const loadData = async () => {
         try {
-            // Fix: Use local date for todayStr to match JST
-            const today = new Date();
-            const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            // Force JST Date
+            const now = new Date();
+            const jstDate = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+            const todayStr = `${jstDate.getFullYear()}-${String(jstDate.getMonth() + 1).padStart(2, '0')}-${String(jstDate.getDate()).padStart(2, '0')}`;
+
+            console.log('AdminDashboard loading for date (JST):', todayStr);
 
             // 1. Today's Reservations
             const reservationsRef = collection(db, 'reservations');
@@ -84,12 +87,6 @@ export default function AdminDashboard() {
                 return {
                     id: doc.id,
                     ...data,
-                    // We need student name. Since we don't join, we might need to fetch student or rely on denormalized student name if we added it.
-                    // We didn't add student name to reservation in SlotReservation.jsx.
-                    // So we need to fetch student names.
-                    // Or, for now, just show student ID or fetch them.
-                    // Let's fetch all students? No.
-                    // Let's fetch students involved in these reservations.
                 };
             });
 
@@ -97,14 +94,6 @@ export default function AdminDashboard() {
             const studentIds = [...new Set(reservationsData.map(r => r.student_id))];
             let studentsMap = {};
             if (studentIds.length > 0) {
-                // Firestore 'in' query supports up to 10. If more, we need to batch or fetch all.
-                // For dashboard, likely not too many students per day.
-                // But to be safe, let's just fetch all students for now (assuming < 1000 active students) or fetch individually.
-                // Or better: update SlotReservation to include student_name in reservation!
-                // But I already wrote SlotReservation without it.
-                // I will fetch students using 'in' batches or just one by one if few.
-                // Let's use 'in' for chunks of 10.
-
                 const chunks = [];
                 for (let i = 0; i < studentIds.length; i += 10) {
                     chunks.push(studentIds.slice(i, i + 10));
@@ -120,8 +109,9 @@ export default function AdminDashboard() {
             }
 
             // Merge
-            const slotsWithReservations = slotsData.map(slot => {
-                const slotReservations = reservationsData
+            // 安全策: slotsDataが空でないか確認
+            const slotsWithReservations = (slotsData || []).map(slot => {
+                const slotReservations = (reservationsData || [])
                     .filter(r => r.slot_id === slot.id)
                     .map(r => ({
                         ...r,
@@ -202,7 +192,7 @@ export default function AdminDashboard() {
     }
 
     return (
-        <div className="space-y-8 pt-6">
+        <div className="space-y-8 pt-10">
             <div className="flex justify-between items-start">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900 tracking-tight">管理者ダッシュボード</h1>

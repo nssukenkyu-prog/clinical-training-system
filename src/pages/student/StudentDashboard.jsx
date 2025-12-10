@@ -145,7 +145,7 @@ export default function StudentDashboard() {
     }
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-8 pt-10">
             {/* Header Section */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>

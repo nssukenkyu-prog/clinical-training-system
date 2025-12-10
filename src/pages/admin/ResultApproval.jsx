@@ -169,7 +169,7 @@ export default function ResultApproval() {
     // formatDate is moved to module scope
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-8 pt-10">
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900">実績承認</h1>

@@ -200,7 +200,7 @@ export default function SlotManagement() {
             { start: '17:30', end: '20:30' }
         ];
 
-        const dateStr = selectedDate.toISOString().split('T')[0];
+        const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
 
         try {
             const batch = writeBatch(db);
@@ -295,7 +295,7 @@ export default function SlotManagement() {
     const selectedDateSlots = getSlotsForDate(selectedDate);
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-8 pt-10">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900">実習枠管理</h1>
