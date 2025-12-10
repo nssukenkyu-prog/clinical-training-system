@@ -84,7 +84,14 @@ function App() {
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<StudentEntry />} />
-        <Route path="/admin/login" element={!user ? <AdminLogin /> : <Navigate to="/admin/dashboard" replace />} />
+
+        {/* Admin Login - Public */}
+        <Route
+          path="/admin/login"
+          element={
+            !user ? <AdminLogin /> : <Navigate to="/admin/dashboard" replace />
+          }
+        />
 
         {/* Student Routes */}
         <Route
@@ -104,20 +111,61 @@ function App() {
           }
         />
 
-        {/* Admin Routes */}
+        {/* Admin Protected Routes - NOT including /admin/login */}
         <Route
-          path="/admin/*"
+          path="/admin/dashboard"
           element={
             user && userRole === 'admin' ? (
               <Layout userRole="admin" userName={userName}>
-                <Routes>
-                  <Route path="dashboard" element={<AdminDashboard />} />
-                  <Route path="slots" element={<SlotManagement />} />
-                  <Route path="students" element={<StudentManagement />} />
-                  <Route path="settings" element={<SystemSettings />} />
-                  <Route path="approvals" element={<ResultApproval />} />
-                  <Route path="*" element={<Navigate to="dashboard" replace />} />
-                </Routes>
+                <AdminDashboard />
+              </Layout>
+            ) : (
+              <Navigate to="/admin/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/slots"
+          element={
+            user && userRole === 'admin' ? (
+              <Layout userRole="admin" userName={userName}>
+                <SlotManagement />
+              </Layout>
+            ) : (
+              <Navigate to="/admin/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/students"
+          element={
+            user && userRole === 'admin' ? (
+              <Layout userRole="admin" userName={userName}>
+                <StudentManagement />
+              </Layout>
+            ) : (
+              <Navigate to="/admin/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/settings"
+          element={
+            user && userRole === 'admin' ? (
+              <Layout userRole="admin" userName={userName}>
+                <SystemSettings />
+              </Layout>
+            ) : (
+              <Navigate to="/admin/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/approvals"
+          element={
+            user && userRole === 'admin' ? (
+              <Layout userRole="admin" userName={userName}>
+                <ResultApproval />
               </Layout>
             ) : (
               <Navigate to="/admin/login" replace />
@@ -128,7 +176,7 @@ function App() {
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </Router >
+    </Router>
   );
 }
 
