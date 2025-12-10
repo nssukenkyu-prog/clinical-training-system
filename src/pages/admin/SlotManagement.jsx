@@ -9,6 +9,7 @@ export default function SlotManagement() {
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const [showModal, setShowModal] = useState(false);
     const [viewMode, setViewMode] = useState('month'); // 'month' or 'day'
     const [formData, setFormData] = useState({
@@ -92,8 +93,10 @@ export default function SlotManagement() {
             });
 
             setSlots(slotsWithReservations);
-        } catch (error) {
-            console.error("Error loading slots:", error);
+            setError(null);
+        } catch (err) {
+            console.error("Error loading slots:", err);
+            setError(err.message || 'データの読み込みに失敗しました');
         } finally {
             setLoading(false);
         }
@@ -239,6 +242,21 @@ export default function SlotManagement() {
         return (
             <div className="flex items-center justify-center h-64">
                 <div className="w-8 h-8 border-2 border-primary border-t-white/0 rounded-full animate-spin"></div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="flex flex-col items-center justify-center h-64 text-center">
+                <div className="text-rose-500 mb-4 text-lg">エラーが発生しました</div>
+                <div className="text-slate-500 text-sm mb-4">{error}</div>
+                <button
+                    onClick={() => { setError(null); loadSlots(); }}
+                    className="px-4 py-2 bg-primary text-white rounded-lg"
+                >
+                    再読み込み
+                </button>
             </div>
         );
     }
