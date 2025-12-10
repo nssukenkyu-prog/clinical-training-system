@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { auth, db } from '../../lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc, orderBy } from 'firebase/firestore';
-import { Clock, Calendar, CheckCircle, AlertCircle, Plus } from 'lucide-react';
+import { collection, query, where, getDocs, doc, getDoc, deleteDoc } from 'firebase/firestore';
+import { Clock, Calendar, CheckCircle, AlertCircle, Plus, Trash2 } from 'lucide-react';
 import { clsx } from 'clsx';
 
 export default function StudentDashboard() {
@@ -39,19 +39,24 @@ export default function StudentDashboard() {
             const studentData = { id: studentDoc.id, ...studentDoc.data() };
             setStudent(studentData);
 
-            // 予約一覧を取得
+            // 予約一覧を取得（キャンセル以外）
             const reservationsRef = collection(db, 'reservations');
             const qReservations = query(
                 reservationsRef,
-                where('student_id', '==', studentId),
-                orderBy('slot_date', 'desc'),
-                orderBy('slot_start_time', 'desc')
+                where('student_id', '==', studentId)
             );
             const reservationsSnapshot = await getDocs(qReservations);
-            const reservationsData = reservationsSnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
+            const reservationsData = reservationsSnapshot.docs
+                .map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }))
+                .filter(r => r.status !== 'cancelled')
+                .sort((a, b) => {
+                    // Sort by date desc, then by time desc
+                    if (a.slot_date !== b.slot_date) return b.slot_date.localeCompare(a.slot_date);
+                    return (b.slot_start_time || '').localeCompare(a.slot_start_time || '');
+                });
             setReservations(reservationsData);
 
             // 累積時間を計算
@@ -107,6 +112,21 @@ export default function StudentDashboard() {
                 {labels[status] || status}
             </span>
         );
+    };
+
+    const handleDeleteReservation = async (reservation) => {
+        if (!window.confirm(`${formatDate(reservation.slot_date)} ${reservation.slot_start_time?.slice(0, 5) || ''} の予約を削除しますか？`)) {
+            return;
+        }
+        try {
+            await deleteDoc(doc(db, 'reservations', reservation.id));
+            // Remove from local state
+            setReservations(reservations.filter(r => r.id !== reservation.id));
+            alert('予約を削除しました');
+        } catch (error) {
+            console.error('Error deleting reservation:', error);
+            alert('削除に失敗しました');
+        }
     };
 
     const formatDate = (dateStr) => {
@@ -215,6 +235,7 @@ export default function StudentDashboard() {
                                     <th className="pb-4 font-medium">実習区分</th>
                                     <th className="pb-4 font-medium">ステータス</th>
                                     <th className="pb-4 font-medium">実習時間</th>
+                                    <th className="pb-4 font-medium">操作</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -238,6 +259,17 @@ export default function StudentDashboard() {
                                             {reservation.actual_minutes
                                                 ? formatTime(reservation.actual_minutes)
                                                 : '-'}
+                                        </td>
+                                        <td className="py-4">
+                                            {reservation.status === 'confirmed' && (
+                                                <button
+                                                    onClick={() => handleDeleteReservation(reservation)}
+                                                    className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                                                    title="予約を削除"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}

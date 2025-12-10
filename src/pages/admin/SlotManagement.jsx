@@ -462,6 +462,18 @@ export default function SlotManagement() {
                                                                     <span className={clsx("px-1.5 py-0.5 rounded text-[10px] font-bold border", getStatusBadge(r.status).color)}>
                                                                         {getStatusBadge(r.status).label}
                                                                     </span>
+                                                                    <button
+                                                                        onClick={async () => {
+                                                                            if (window.confirm(`${r.student_name}の予約を削除しますか？`)) {
+                                                                                await deleteDoc(doc(db, 'reservations', r.id));
+                                                                                loadSlots();
+                                                                            }
+                                                                        }}
+                                                                        className="p-1 text-rose-500 hover:bg-rose-50 rounded transition-colors"
+                                                                        title="予約を削除"
+                                                                    >
+                                                                        <Trash2 className="w-3 h-3" />
+                                                                    </button>
                                                                 </div>
                                                             ))}
                                                         </div>
