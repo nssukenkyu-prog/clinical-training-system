@@ -46,7 +46,10 @@ export default function StudentEntry() {
                 return;
             }
 
-            // 3. 次のステップ判定
+            // 3. 認証実行 (書き込み権限確保のため、まずログインする)
+            await signInAnonymously(auth);
+
+            // 4. 次のステップ判定
             setTargetStudent({ id: studentDoc.id, ...studentData });
             if (studentData.password_hash) {
                 setStep('verify');
@@ -83,7 +86,7 @@ export default function StudentEntry() {
                     return;
                 }
 
-                // DB保存
+                // DB保存 (すでにログイン済みなのでupdateDoc可能)
                 await updateDoc(doc(db, 'students', targetStudent.id), {
                     password_hash: hashedPassword
                 });
@@ -96,8 +99,7 @@ export default function StudentEntry() {
                 }
             }
 
-            // ログイン処理共通
-            await signInAnonymously(auth);
+            // セッションに保存してダッシュボードへ
             sessionStorage.setItem('clinical_student_id', targetStudent.id);
             sessionStorage.setItem('clinical_student_name', targetStudent.name);
             navigate('/student/dashboard');

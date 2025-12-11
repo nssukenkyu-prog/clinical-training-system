@@ -17,6 +17,9 @@ export default function AdminLogin() {
         setError('');
         setLoading(true);
 
+        // 既存のセッションがあればクリア
+        await signOut(auth);
+
         try {
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
