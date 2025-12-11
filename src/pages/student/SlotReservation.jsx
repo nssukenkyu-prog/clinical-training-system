@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { auth, db } from '../../lib/firebase';
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, getDoc } from 'firebase/firestore';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, AlertCircle, X, List, LayoutGrid } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, AlertCircle, X, List, LayoutGrid, Info } from 'lucide-react';
 import { clsx } from 'clsx';
 
 export default function SlotReservation() {
