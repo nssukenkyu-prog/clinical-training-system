@@ -13,7 +13,6 @@ import {
     Settings,
     Bell
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { auth } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
 
@@ -85,8 +84,7 @@ export default function Layout() {
                                 <link.icon className={`w-5 h-5 ${isActive ? 'text-indigo-400' : 'text-slate-400 group-hover:text-indigo-500'} transition-colors`} />
                                 <span className="font-bold text-sm tracking-wide">{link.label}</span>
                                 {isActive && (
-                                    <motion.div
-                                        layoutId="activeDesktop"
+                                    <div
                                         className="absolute right-4 w-1.5 h-1.5 rounded-full bg-indigo-400"
                                     />
                                 )}
@@ -144,8 +142,7 @@ export default function Layout() {
                                 <div className={`relative p-1.5 rounded-xl transition-all duration-300 ${isActive ? 'bg-indigo-50 -translate-y-1' : ''}`}>
                                     <link.icon className={`w-6 h-6 ${isActive ? 'text-indigo-600' : 'text-slate-400'} transition-colors duration-300`} />
                                     {isActive && (
-                                        <motion.div
-                                            layoutId="activeMobile"
+                                        <div
                                             className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-indigo-600"
                                         />
                                     )}
