@@ -68,27 +68,42 @@ function App() {
     }
   };
 
+  /* 
+     Fix: checkingRoleが永久にtrueのままになるのを防ぐため、
+     初期ロード完了後に強制的にfalseにするフェールセーフを入れる。 
+     また、onAuthStateChangedは信頼性が高いので、そこでの判定を主とする。
+  */
+  useEffect(() => {
+    // 5秒経ってもロードが終わらない場合は強制解除 (白画面対策)
+    const timer = setTimeout(() => {
+      if (loading || checkingRole) {
+        console.warn("Force ending loading state due to timeout");
+        setLoading(false);
+        setCheckingRole(false);
+      }
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [loading, checkingRole]);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
-      setLoading(false); // Auth init complete
 
       if (currentUser) {
-        if (currentUser.isAnonymous) {
-          // 匿名ログイン（学生）の場合は役割チェックをスキップして、画面リロード（ローディング表示）を防ぐ
-          setCheckingRole(false);
-        } else {
-          await checkUserRole(currentUser);
-        }
+        // ログイン状態なら役割を確認
+        await checkUserRole(currentUser);
       } else {
+        // ログアウト状態なら役割なし
+        setUserRole(null);
         setCheckingRole(false);
       }
+      setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
-  if (loading || checkingRole) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -105,11 +120,11 @@ function App() {
         {/* Public Routes */}
         <Route path="/" element={<StudentEntry />} />
 
-        {/* Admin Login - Public */}
+        {/* Admin Login - Always accessible if not admin */}
         <Route
           path="/admin/login"
           element={
-            !user ? <AdminLogin /> : <Navigate to="/admin/dashboard" replace />
+            user && userRole === 'admin' ? <Navigate to="/admin/dashboard" replace /> : <AdminLogin />
           }
         />
 
@@ -117,8 +132,9 @@ function App() {
         <Route
           path="/student/*"
           element={
-            sessionStorage.getItem('clinical_student_id') ? (
-              <Layout userRole="student" userName={sessionStorage.getItem('clinical_student_name') || 'Student'}>
+            // セッションIDがあるかどうかで判定 (Auth認証よりもセッションを優先して学生とみなす簡便な実装)
+            sessionStorage.getItem('clinical_student_id') || (user && userRole === 'student') ? (
+              <Layout userRole="student" userName={sessionStorage.getItem('clinical_student_name') || userName || 'Student'}>
                 <Routes>
                   <Route path="dashboard" element={<StudentDashboard />} />
                   <Route path="reservation" element={<SlotReservation />} />
@@ -131,61 +147,24 @@ function App() {
           }
         />
 
-        {/* Admin Protected Routes - NOT including /admin/login */}
+        {/* Admin Protected Routes */}
         <Route
-          path="/admin/dashboard"
+          path="/admin/*"
           element={
+            /* checkUserRole中（checkingRole=true）の場合は、まだリダイレクトしないようにローディングを出すべきだが、
+               ここではloading=falseになっている前提なので、userRoleを見る。
+               もし管理者としてログイン中なら表示、そうでなければログインへ。
+            */
             user && userRole === 'admin' ? (
               <Layout userRole="admin" userName={userName}>
-                <AdminDashboard />
-              </Layout>
-            ) : (
-              <Navigate to="/admin/login" replace />
-            )
-          }
-        />
-        <Route
-          path="/admin/slots"
-          element={
-            user && userRole === 'admin' ? (
-              <Layout userRole="admin" userName={userName}>
-                <SlotManagement />
-              </Layout>
-            ) : (
-              <Navigate to="/admin/login" replace />
-            )
-          }
-        />
-        <Route
-          path="/admin/students"
-          element={
-            user && userRole === 'admin' ? (
-              <Layout userRole="admin" userName={userName}>
-                <StudentManagement />
-              </Layout>
-            ) : (
-              <Navigate to="/admin/login" replace />
-            )
-          }
-        />
-        <Route
-          path="/admin/settings"
-          element={
-            user && userRole === 'admin' ? (
-              <Layout userRole="admin" userName={userName}>
-                <SystemSettings />
-              </Layout>
-            ) : (
-              <Navigate to="/admin/login" replace />
-            )
-          }
-        />
-        <Route
-          path="/admin/approvals"
-          element={
-            user && userRole === 'admin' ? (
-              <Layout userRole="admin" userName={userName}>
-                <ResultApproval />
+                <Routes>
+                  <Route path="dashboard" element={<AdminDashboard />} />
+                  <Route path="slots" element={<SlotManagement />} />
+                  <Route path="students" element={<StudentManagement />} />
+                  <Route path="settings" element={<SystemSettings />} />
+                  <Route path="approvals" element={<ResultApproval />} />
+                  <Route path="*" element={<Navigate to="dashboard" replace />} />
+                </Routes>
               </Layout>
             ) : (
               <Navigate to="/admin/login" replace />
