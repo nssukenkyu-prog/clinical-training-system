@@ -9,6 +9,7 @@ export default function StudentDashboard() {
     const [student, setStudent] = useState(null);
     const [reservations, setReservations] = useState([]);
     const [totalMinutes, setTotalMinutes] = useState(0);
+    const [reservedMinutes, setReservedMinutes] = useState(0);
     const [settings, setSettings] = useState(null);
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
