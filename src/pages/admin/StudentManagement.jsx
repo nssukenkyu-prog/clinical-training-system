@@ -20,6 +20,7 @@ export default function StudentManagement() {
     const [csvData, setCsvData] = useState('');
     const [filter, setFilter] = useState({ grade: 'all', trainingType: 'all' });
     const [sending, setSending] = useState(false);
+    const [selectedStudentIds, setSelectedStudentIds] = useState(new Set());
 
     useEffect(() => {
         loadStudents();
@@ -244,7 +245,7 @@ export default function StudentManagement() {
         }
     };
 
-    const [selectedStudentIds, setSelectedStudentIds] = useState(new Set());
+
 
     const handleToggleSelect = (studentId) => {
         const newSelected = new Set(selectedStudentIds);
