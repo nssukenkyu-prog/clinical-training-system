@@ -236,68 +236,175 @@ export default function SlotReservation() {
                                 subject: '【臨床実習】予約完了のお知らせ',
                                 body: `
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="supported-color-schemes" content="light dark">
+  <style>
+    :root {
+      color-scheme: light dark;
+      supported-color-schemes: light dark;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f1f5f9;
+      color: #1e293b;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    .card {
+      background-color: #ffffff;
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+    }
+    .header {
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      padding: 40px 30px;
+      text-align: center;
+    }
+    .header h1 {
+      margin: 0;
+      color: #ffffff;
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+    }
+    .header p {
+      margin: 10px 0 0;
+      color: rgba(255,255,255,0.9);
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .content {
+      padding: 40px 30px;
+    }
+    .greeting {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 24px;
+    }
+    .message {
+      font-size: 15px;
+      line-height: 1.8;
+      color: #475569;
+      margin-bottom: 32px;
+    }
+    .details-box {
+      background-color: #f8fafc;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 32px;
+      border: 1px solid #e2e8f0;
+    }
+    .detail-row {
+      display: flex;
+      margin-bottom: 12px;
+      align-items: center;
+    }
+    .detail-row:last-child {
+      margin-bottom: 0;
+    }
+    .detail-icon {
+      width: 24px;
+      font-size: 18px;
+      margin-right: 12px;
+    }
+    .detail-label {
+      font-size: 13px;
+      color: #64748b;
+      width: 60px;
+      font-weight: 600;
+    }
+    .detail-value {
+      font-size: 15px;
+      font-weight: 700;
+      color: #1e293b;
+    }
+    .footer {
+      text-align: center;
+      padding-top: 30px;
+      border-top: 1px solid #f1f5f9;
+    }
+    .footer p {
+      font-size: 12px;
+      color: #94a3b8;
+      margin: 0;
+    }
+    
+    /* Dark Mode Styles */
+    @media (prefers-color-scheme: dark) {
+      body {
+        background-color: #0f172a !important;
+        color: #e2e8f0 !important;
+      }
+      .card {
+        background-color: #1e293b !important;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2) !important;
+      }
+      .message {
+        color: #cbd5e1 !important;
+      }
+      .details-box {
+        background-color: #334155 !important;
+        border-color: #475569 !important;
+      }
+      .detail-label {
+        color: #94a3b8 !important;
+      }
+      .detail-value {
+        color: #f1f5f9 !important;
+      }
+      .footer {
+        border-top-color: #334155 !important;
+      }
+    }
+  </style>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f5f7fa;">
-  <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
-    <!-- Header -->
-    <div style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border-radius: 16px 16px 0 0; padding: 32px; text-align: center;">
-      <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 700;">NSSU 臨床実習予約システム</h1>
-      <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px;">予約完了のお知らせ</p>
-    </div>
-    
-    <!-- Content -->
-    <div style="background: white; padding: 32px; border-radius: 0 0 16px 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-      <p style="color: #1e293b; font-size: 16px; margin: 0 0 24px 0;">
-        <strong>${student.name}</strong> 様
-      </p>
-      
-      <p style="color: #64748b; font-size: 14px; margin: 0 0 24px 0; line-height: 1.6;">
-        以下の日程で実習予約を受け付けました。
-      </p>
-      
-      <!-- Reservation Details Card -->
-      <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-radius: 12px; padding: 24px; margin-bottom: 24px; border-left: 4px solid #6366f1;">
-        <table style="width: 100%; border-collapse: collapse;">
-          <tr>
-            <td style="padding: 8px 0; color: #64748b; font-size: 13px; width: 80px;">📅 日付</td>
-            <td style="padding: 8px 0; color: #1e293b; font-size: 15px; font-weight: 600;">${slot.date}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #64748b; font-size: 13px;">⏰ 時間</td>
-            <td style="padding: 8px 0; color: #1e293b; font-size: 15px; font-weight: 600;">${customStartTime} - ${customEndTime}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #64748b; font-size: 13px;">📋 区分</td>
-            <td style="padding: 8px 0; color: #1e293b; font-size: 15px; font-weight: 600;">臨床実習 ${slot.training_type}</td>
-          </tr>
-        </table>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="header">
+        <h1>CLINICAL TRAINING</h1>
+        <p>RESERVATION CONFIRMED</p>
       </div>
-      
-      <!-- Notice -->
-      <div style="background: #fef3c7; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
-        <p style="color: #92400e; font-size: 13px; margin: 0; line-height: 1.5;">
-          ⚠️ キャンセルや変更はシステムから行ってください。<br>
-          当日欠席の場合は、必ず事前にご連絡ください。
+      <div class="content">
+        <div class="greeting">${student.name} 様</div>
+        <p class="message">
+          実習予約が完了しました。<br>
+          以下の日程でスケジュールが確保されています。
         </p>
-      </div>
-      
-      <!-- Footer -->
-      <div style="border-top: 1px solid #e2e8f0; padding-top: 24px; text-align: center;">
-        <p style="color: #94a3b8; font-size: 12px; margin: 0;">
-          このメールは自動送信されています。<br>
-          ご不明な点がございましたら、担当者までお問い合わせください。
-        </p>
+        
+        <div class="details-box">
+          <div class="detail-row">
+            <span class="detail-icon">📅</span>
+            <span class="detail-label">DATE</span>
+            <span class="detail-value">${slot.date}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-icon">⏰</span>
+            <span class="detail-label">TIME</span>
+            <span class="detail-value">${customStartTime} - ${customEndTime}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-icon">📋</span>
+            <span class="detail-label">TYPE</span>
+            <span class="detail-value">臨床実習 ${slot.training_type}</span>
+          </div>
+        </div>
+
+        <div class="footer">
+          <p>© ${new Date().getFullYear()} NSSU Clinical Training System</p>
+        </div>
       </div>
     </div>
-    
-    <!-- Branding -->
-    <p style="text-align: center; color: #94a3b8; font-size: 11px; margin-top: 24px;">
-      © ${new Date().getFullYear()} NSSU 臨床実習予約システム
-    </p>
   </div>
 </body>
 </html>
