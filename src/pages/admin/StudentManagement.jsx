@@ -244,6 +244,47 @@ export default function StudentManagement() {
         }
     };
 
+    const [selectedStudentIds, setSelectedStudentIds] = useState(new Set());
+
+    const handleToggleSelect = (studentId) => {
+        const newSelected = new Set(selectedStudentIds);
+        if (newSelected.has(studentId)) {
+            newSelected.delete(studentId);
+        } else {
+            newSelected.add(studentId);
+        }
+        setSelectedStudentIds(newSelected);
+    };
+
+    const handleSelectAll = (e) => {
+        if (e.target.checked) {
+            setSelectedStudentIds(new Set(filteredStudents.map(s => s.id)));
+        } else {
+            setSelectedStudentIds(new Set());
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedStudentIds.size === 0) return;
+        if (!window.confirm(`選択した ${selectedStudentIds.size} 名の学生を削除しますか？\n※この操作は取り消せません。`)) return;
+
+        try {
+            const batch = writeBatch(db);
+            selectedStudentIds.forEach(id => {
+                batch.delete(doc(db, 'students', id));
+            });
+            await batch.commit();
+            alert('削除しました');
+            setSelectedStudentIds(new Set());
+            loadStudents();
+        } catch (error) {
+            console.error("Error bulk deleting students:", error);
+            alert('一括削除に失敗しました');
+        }
+    };
+
+    const isAllSelected = filteredStudents.length > 0 && selectedStudentIds.size === filteredStudents.length;
+
     return (
         <div className="space-y-8 pt-10">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -252,6 +293,15 @@ export default function StudentManagement() {
                     <p className="text-slate-500 mt-1">学生の登録・編集・進捗確認を行います</p>
                 </div >
                 <div className="flex gap-3">
+                    {selectedStudentIds.size > 0 && (
+                        <button
+                            onClick={handleBulkDelete}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 transition-colors shadow-sm font-bold"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                            <span>{selectedStudentIds.size}件を削除</span>
+                        </button>
+                    )}
                     <button
                         onClick={() => {
                             setEditingStudent(null);
@@ -311,6 +361,14 @@ export default function StudentManagement() {
                     <table className="w-full">
                         <thead>
                             <tr className="border-b border-slate-200 bg-slate-50">
+                                <th className="px-6 py-4 text-left">
+                                    <input
+                                        type="checkbox"
+                                        className="rounded border-slate-300 text-primary focus:ring-primary"
+                                        checked={isAllSelected}
+                                        onChange={handleSelectAll}
+                                    />
+                                </th>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500">学籍番号</th>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500">氏名</th>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500">学年</th>
@@ -322,7 +380,15 @@ export default function StudentManagement() {
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {filteredStudents.map(student => (
-                                <tr key={student.id} className="hover:bg-slate-50 transition-colors">
+                                <tr key={student.id} className={`hover:bg-slate-50 transition-colors ${selectedStudentIds.has(student.id) ? 'bg-slate-50' : ''}`}>
+                                    <td className="px-6 py-4">
+                                        <input
+                                            type="checkbox"
+                                            className="rounded border-slate-300 text-primary focus:ring-primary"
+                                            checked={selectedStudentIds.has(student.id)}
+                                            onChange={() => handleToggleSelect(student.id)}
+                                        />
+                                    </td>
                                     <td className="px-6 py-4 text-sm font-mono text-slate-600">{student.student_number}</td>
                                     <td className="px-6 py-4 text-sm font-medium text-slate-900">{student.name}</td>
                                     <td className="px-6 py-4 text-sm text-slate-500">{student.grade}年</td>
