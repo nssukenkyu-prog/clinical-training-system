@@ -14,7 +14,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "firebase": "^12.6.0",
-    "framer-motion": "^12.23.25",
+    "framer-motion": "^12.23.26",
     "lucide-react": "^0.556.0",
     "postcss": "^8.4.31",
     "react": "^19.2.0",

@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { db, auth } from '../../lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { signInAnonymously } from 'firebase/auth';
-import { User, LockOpen } from 'lucide-react';
+import { User, ArrowRight, Activity, ShieldCheck, GraduationCap } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export default function StudentEntry() {
     const [studentNumber, setStudentNumber] = useState('');
@@ -42,7 +43,7 @@ export default function StudentEntry() {
                 return;
             }
 
-            // 3. 匿名ログイン (Firestoreの認証ルールを通過するため)
+            // 3. 匿名ログイン
             await signInAnonymously(auth);
 
             // 4. セッションに保存
@@ -61,83 +62,133 @@ export default function StudentEntry() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50 relative overflow-hidden">
-            {/* Background Decorations */}
-            <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-                <div className="absolute top-[-10%] right-[-5%] w-96 h-96 bg-blue-200/20 rounded-full blur-3xl"></div>
-                <div className="absolute bottom-[-10%] left-[-5%] w-96 h-96 bg-emerald-200/20 rounded-full blur-3xl"></div>
-            </div>
-
-            <div className="w-full max-w-md bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl p-8 border border-white/20 relative z-10 transition-all hover:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)]">
-                <div className="text-center mb-10">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-500/30 mb-6 group transition-all duration-500 hover:scale-110 hover:rotate-3">
-                        <LockOpen className="w-8 h-8 text-white group-hover:animate-pulse" />
-                    </div>
-                    <h1 className="text-2xl font-bold text-slate-900 tracking-tight">NSSU 令和8年度 臨床実習</h1>
-                    <p className="text-slate-500 mt-2 text-sm font-medium">学籍番号と氏名を入力して開始してください</p>
+        <div className="min-h-screen flex bg-white">
+            {/* Left Side - Hero / Branding (Desktop only) */}
+            <div className="hidden lg:flex lg:w-1/2 bg-slate-900 relative overflow-hidden flex-col justify-between p-12 text-white">
+                <div className="absolute inset-0 z-0">
+                    <div className="absolute top-[-20%] left-[-20%] w-[80%] h-[80%] bg-blue-600/20 rounded-full blur-[120px]" />
+                    <div className="absolute bottom-[-20%] right-[-20%] w-[80%] h-[80%] bg-emerald-600/20 rounded-full blur-[120px]" />
+                    <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')] bg-cover bg-center opacity-10 mix-blend-overlay"></div>
                 </div>
 
-                {error && (
-                    <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-100 text-rose-600 text-sm flex items-center gap-2 animate-shake">
-                        <div className="w-1.5 h-1.5 rounded-full bg-rose-500"></div>
-                        {error}
-                    </div>
-                )}
-
-                <form onSubmit={handleEntry} className="space-y-6">
-                    <div className="space-y-2">
-                        <label className="text-sm font-bold text-slate-700 ml-1">学籍番号</label>
-                        <div className="relative group">
-                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                <User className="h-5 w-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-                            </div>
-                            <input
-                                type="text"
-                                className="w-full pl-11 pr-4 py-3.5 bg-[#24ca00] bg-opacity-10 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-slate-900 placeholder:text-slate-400 font-mono transition-all duration-300 hover:bg-white"
-                                placeholder="2024001"
-                                value={studentNumber}
-                                onChange={(e) => setStudentNumber(e.target.value)}
-                                required
-                            />
+                <div className="relative z-10">
+                    <div className="flex items-center gap-3 mb-8">
+                        <div className="p-2 bg-white/10 backdrop-blur-md rounded-lg border border-white/10">
+                            <Activity className="w-6 h-6 text-emerald-400" />
                         </div>
+                        <span className="font-bold text-lg tracking-wide opacity-90">NSSU CLINICAL TRAINING</span>
                     </div>
 
-                    <div className="space-y-2">
-                        <label className="text-sm font-bold text-slate-700 ml-1">氏名</label>
-                        <div className="relative group">
-                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                <User className="h-5 w-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-                            </div>
-                            <input
-                                type="text"
-                                className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-slate-900 placeholder:text-slate-400 transition-all duration-300 hover:bg-white"
-                                placeholder="日体 太郎"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                required
-                            />
-                        </div>
-                        <p className="text-xs text-slate-400 ml-1">※ 登録されている氏名と完全に一致させる必要があります</p>
-                    </div>
-
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:scale-100"
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.8 }}
                     >
-                        {loading ? (
-                            <div className="flex items-center justify-center gap-2">
-                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                <span>確認中...</span>
-                            </div>
-                        ) : '開始する'}
-                    </button>
-                </form>
+                        <h1 className="text-5xl font-bold leading-tight mb-6">
+                            未来の医療を担う<br />
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
+                                プロフェッショナルへ
+                            </span>
+                        </h1>
+                        <p className="text-lg text-slate-300 max-w-md leading-relaxed">
+                            令和8年度 臨床実習管理システムへようこそ。<br />
+                            実習スケジュールの管理、実績の記録をここから始めましょう。
+                        </p>
+                    </motion.div>
+                </div>
 
-                <div className="mt-8 text-center">
-                    <a href="/admin/login" className="text-xs text-slate-400 hover:text-blue-600 transition-colors font-medium hover:underline decoration-blue-600/30 underline-offset-4">
-                        管理者はこちら
-                    </a>
+                <div className="relative z-10 flex gap-8 text-sm font-medium text-slate-400">
+                    <div className="flex items-center gap-2">
+                        <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                        <span>Secure Access</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <GraduationCap className="w-4 h-4 text-blue-400" />
+                        <span>Student Portal</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Right Side - Login Form */}
+            <div className="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-12 relative">
+                <div className="w-full max-w-md">
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, delay: 0.2 }}
+                    >
+                        <div className="mb-10">
+                            <h2 className="text-3xl font-bold text-slate-900 mb-2">ログイン</h2>
+                            <p className="text-slate-500">学籍番号と氏名を入力してください</p>
+                        </div>
+
+                        {error && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-100 text-rose-600 text-sm flex items-center gap-3"
+                            >
+                                <div className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                                {error}
+                            </motion.div>
+                        )}
+
+                        <form onSubmit={handleEntry} className="space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-slate-700">学籍番号</label>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        className="w-full pl-4 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white text-slate-900 font-mono transition-all duration-200 placeholder:text-slate-400"
+                                        placeholder="2024001"
+                                        value={studentNumber}
+                                        onChange={(e) => setStudentNumber(e.target.value)}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-slate-700">氏名</label>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        className="w-full pl-4 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white text-slate-900 transition-all duration-200 placeholder:text-slate-400"
+                                        placeholder="日体 太郎"
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                        required
+                                    />
+                                </div>
+                                <p className="text-xs text-slate-400">※ 登録氏名と完全に一致する必要があります</p>
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 active:scale-[0.98] transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
+                            >
+                                {loading ? (
+                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                ) : (
+                                    <>
+                                        <span>実習を開始する</span>
+                                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                    </>
+                                )}
+                            </button>
+                        </form>
+
+                        <div className="mt-12 pt-6 border-t border-slate-100 text-center">
+                            <p className="text-xs text-slate-400 mb-4">管理者の方はこちら</p>
+                            <a
+                                href="/admin/login"
+                                className="inline-flex items-center justify-center px-6 py-2 rounded-lg bg-slate-50 text-slate-600 text-sm font-medium hover:bg-slate-100 transition-colors"
+                            >
+                                管理者ログイン
+                            </a>
+                        </div>
+                    </motion.div>
                 </div>
             </div>
         </div>
