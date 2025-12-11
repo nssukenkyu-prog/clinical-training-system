@@ -388,6 +388,12 @@ export default function SlotReservation() {
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900">実習予約</h1>
                     <p className="text-slate-500 mt-1">希望する日時を選択してください</p>
+                    {student && (
+                        <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-sm font-bold border border-indigo-100">
+                            <Info className="w-4 h-4" />
+                            <span>対象区分: 臨床実習{student.training_type}</span>
+                        </div>
+                    )}
                 </div>
                 <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
                     <button
