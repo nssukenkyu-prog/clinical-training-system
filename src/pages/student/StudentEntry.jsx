@@ -83,8 +83,12 @@ export default function StudentEntry() {
 
         } catch (err) {
             console.error(err);
-            setError(err.message || 'ログイン中にエラーが発生しました。');
-            // エラー時はログアウトしておく（不完全な状態を防ぐ）
+            if (err.code === 'auth/operation-not-allowed') {
+                setError('システムエラー: 匿名ログインが無効になっています。管理者に連絡してください。');
+            } else {
+                setError(err.message || 'ログイン中にエラーが発生しました。');
+            }
+            // エラー時はログアウトしておく
             auth.signOut();
         } finally {
             setLoading(false);
