@@ -63,10 +63,23 @@ export default function StudentDashboard() {
                 });
             setReservations(reservationsData);
 
-            // 累積時間を計算
+            // Calculate Accumulated Minutes
+            // 1. Approved (Completed) - based on ACTUAL minutes
             const completed = reservationsData.filter(r => r.status === 'completed');
-            const total = completed.reduce((sum, r) => sum + (r.actual_minutes || 0), 0);
-            setTotalMinutes(total);
+            const totalApproved = completed.reduce((sum, r) => sum + (r.actual_minutes || 0), 0);
+            setTotalMinutes(totalApproved);
+
+            // 2. Reserved (Planned) - based on SCHEDULED duration of ALL active reservations (confirmed + completed)
+            // Even completed ones count towards "what was reserved" unless we strictly mean "future".
+            // User said: "Student reserved time... even after admin approves, this shouldn't disappear".
+            // So this metric tracks the cumulative time the student HAS reserved/attended.
+            const totalReserved = reservationsData.reduce((sum, r) => {
+                const start = new Date(`1970-01-01T${r.slot_start_time}`);
+                const end = new Date(`1970-01-01T${r.slot_end_time}`);
+                const duration = (end - start) / (1000 * 60); // minutes
+                return sum + (duration > 0 ? duration : 0);
+            }, 0);
+            setReservedMinutes(totalReserved);
 
             // システム設定を取得
             const settingsRef = collection(db, 'settings');
@@ -220,7 +233,7 @@ export default function StudentDashboard() {
 
                     <div className="mb-4">
                         <div className="flex justify-between text-sm mb-2">
-                            <span className="text-slate-500">達成率</span>
+                            <span className="text-slate-500">達成率 (承認ベース)</span>
                             <span className="font-bold text-xl text-slate-900">{Math.round(getProgressPercent())}%</span>
                         </div>
                         <div className="h-4 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
@@ -229,16 +242,27 @@ export default function StudentDashboard() {
                                 style={{ width: `${getProgressPercent()}%` }}
                             />
                         </div>
+                        <p className="text-xs text-slate-400 mt-2 text-right">
+                            ※実習進捗率は、管理者が実習完了を承認した後に更新されます。
+                        </p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 mt-6">
                         <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-                            <p className="text-sm text-slate-500 mb-1">現在の累積時間</p>
-                            <p className="text-2xl font-bold text-slate-900">{formatTime(totalMinutes)}</p>
+                            <p className="text-xs text-slate-500 mb-1">予約済み時間 (累積)</p>
+                            <p className="text-xl font-bold text-slate-900">{formatTime(reservedMinutes)}</p>
+                            <p className="text-[10px] text-slate-400 mt-1">※完了・承認含む全予約</p>
                         </div>
                         <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-                            <p className="text-sm text-slate-500 mb-1">必須時間</p>
-                            <p className="text-2xl font-bold text-slate-700">{formatTime(settings?.requiredMinutes || 1260)}</p>
+                            <p className="text-xs text-slate-500 mb-1">承認済み時間 (実績)</p>
+                            <p className="text-2xl font-bold text-slate-900">{formatTime(totalMinutes)}</p>
+                        </div>
+                    </div>
+
+                    <div className="mt-4 p-3 rounded-lg bg-slate-50 border border-slate-100">
+                        <div className="flex justify-between items-center">
+                            <span className="text-sm text-slate-500">必須時間</span>
+                            <span className="text-lg font-bold text-slate-700">{formatTime(settings?.requiredMinutes || 1260)}</span>
                         </div>
                     </div>
 

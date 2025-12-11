@@ -17,7 +17,7 @@ export default function SlotReservation() {
     const [selectedSlot, setSelectedSlot] = useState(null);
     const [customStartTime, setCustomStartTime] = useState('');
     const [customEndTime, setCustomEndTime] = useState('');
-    const [viewMode, setViewMode] = useState('day'); // 'month' or 'day'
+    const [viewMode, setViewMode] = useState('month'); // 'month' or 'day'
     const navigate = useNavigate();
 
     useEffect(() => {
