@@ -78,8 +78,8 @@ export default function Layout() {
                                 key={link.path}
                                 to={link.path}
                                 className={`relative flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all duration-300 group ${isActive
-                                        ? 'bg-slate-900 text-white shadow-xl shadow-slate-900/20'
-                                        : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+                                    ? 'bg-slate-900 text-white shadow-xl shadow-slate-900/20'
+                                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
                                     }`}
                             >
                                 <link.icon className={`w-5 h-5 ${isActive ? 'text-indigo-400' : 'text-slate-400 group-hover:text-indigo-500'} transition-colors`} />
@@ -131,7 +131,7 @@ export default function Layout() {
             </main>
 
             {/* Mobile Bottom Navigation */}
-            <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-slate-200/60 pb-safe z-50">
+            <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-slate-200/60 z-50">
                 <div className="flex justify-around items-center px-2 py-2">
                     {links.map((link) => {
                         const isActive = location.pathname === link.path;

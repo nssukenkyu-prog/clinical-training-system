@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
-import { Users, Calendar, CheckCircle2, Clock, ArrowRight, TrendingUp, Activity } from 'lucide-react';
+import { Users, CalendarDays, CheckCircle2, Clock, ArrowRight, TrendingUp, Activity } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function AdminDashboard() {
@@ -28,8 +28,11 @@ export default function AdminDashboard() {
                 const todayData = await Promise.all(todaySnap.docs.map(async (doc) => {
                     const data = doc.data();
                     // Fetch student name
-                    const studentDoc = await getDocs(query(collection(db, 'students'), where('__name__', '==', data.student_id)));
-                    const studentName = !studentDoc.empty ? studentDoc.docs[0].data().name : 'Unknown';
+                    let studentName = 'Unknown';
+                    if (data.student_id) {
+                        const studentDoc = await getDocs(query(collection(db, 'students'), where('__name__', '==', data.student_id)));
+                        if (!studentDoc.empty) studentName = studentDoc.docs[0].data().name;
+                    }
                     return { id: doc.id, ...data, studentName };
                 }));
                 setTodayList(todayData);
@@ -72,7 +75,7 @@ export default function AdminDashboard() {
     }
 
     const statCards = [
-        { label: '今日の予約', value: stats.todayReservations, icon: Calendar, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+        { label: '今日の予約', value: stats.todayReservations, icon: CalendarDays, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
         { label: '登録学生数', value: stats.totalStudents, icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-100' },
         { label: '有効な実習枠', value: stats.activeSlots, icon: Activity, color: 'text-violet-600', bg: 'bg-violet-50', border: 'border-violet-100' },
         { label: '承認済の実習', value: stats.completedTrainings, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
@@ -154,8 +157,8 @@ export default function AdminDashboard() {
                                         <div className="font-bold text-lg text-slate-900 mb-1">{res.studentName}</div>
                                         <div className="flex items-center gap-2">
                                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${res.slot_training_type === 'I' ? 'bg-blue-100 text-blue-700' :
-                                                    res.slot_training_type === 'II' ? 'bg-emerald-100 text-emerald-700' :
-                                                        'bg-purple-100 text-purple-700'
+                                                res.slot_training_type === 'II' ? 'bg-emerald-100 text-emerald-700' :
+                                                    'bg-purple-100 text-purple-700'
                                                 }`}>
                                                 Type {res.slot_training_type}
                                             </span>
