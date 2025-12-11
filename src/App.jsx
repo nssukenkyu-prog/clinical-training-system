@@ -74,7 +74,12 @@ function App() {
       setLoading(false); // Auth init complete
 
       if (currentUser) {
-        await checkUserRole(currentUser);
+        if (currentUser.isAnonymous) {
+          // 匿名ログイン（学生）の場合は役割チェックをスキップして、画面リロード（ローディング表示）を防ぐ
+          setCheckingRole(false);
+        } else {
+          await checkUserRole(currentUser);
+        }
       } else {
         setCheckingRole(false);
       }
