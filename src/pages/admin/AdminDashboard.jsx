@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { db } from '../../lib/firebase';
-import { collection, query, where, getDocs, getCountFromServer, orderBy } from 'firebase/firestore';
-import { Users, Calendar, CheckSquare, Clock, ArrowRight, Activity } from 'lucide-react';
+import { collection, query, where, getDocs, getCountFromServer } from 'firebase/firestore';
+import { Users, Calendar, CheckSquare, Clock, ArrowRight, Activity, Download } from 'lucide-react';
 import { clsx } from 'clsx';
 
 export default function AdminDashboard() {
@@ -21,9 +21,12 @@ export default function AdminDashboard() {
 
     const loadData = async () => {
         try {
-            // Fix: Use local date for todayStr to match JST
-            const today = new Date();
-            const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            // Force JST Date
+            const now = new Date();
+            const jstDate = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+            const todayStr = `${jstDate.getFullYear()}-${String(jstDate.getMonth() + 1).padStart(2, '0')}-${String(jstDate.getDate()).padStart(2, '0')}`;
+
+            console.log('AdminDashboard loading for date (JST):', todayStr);
 
             // 1. Today's Reservations
             const reservationsRef = collection(db, 'reservations');
@@ -61,18 +64,28 @@ export default function AdminDashboard() {
                 completedTrainings: completedSnapshot.data().count
             });
 
-            // 今日の枠一覧
+            // 今日の枠一覧 - 修正: インデックス問題を回避するためクライアントサイドフィルタリングを使用
+            // 単純なクエリで取得し、JSでフィルタリングとソートを行う
             const qTodaySlots = query(
                 slotsRef,
-                where('date', '==', todayStr),
                 where('is_active', '==', true),
-                orderBy('start_time')
+                where('date', '>=', todayStr) // 今日以降を取得
+                // orderBy は外す（インデックス回避のため）
             );
             const todaySlotsSnapshot = await getDocs(qTodaySlots);
-            const slotsData = todaySlotsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const allActiveSlots = todaySlotsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+            // JSで「今日」かつ「開始時間順」にフィルタリング・ソート
+            const slotsData = allActiveSlots
+                .filter(slot => slot.date === todayStr)
+                .sort((a, b) => a.start_time.localeCompare(b.start_time));
+
+            console.log(`Loaded ${slotsData.length} slots for today (${todayStr})`);
 
             // Fetch reservations for today's slots
             // Using denormalized slot_date
+            // ここも同様に修正しても良いが、statusとslot_dateの複合ならインデックスがある可能性が高い
+            // 念のため、reservationsも安全策をとる
             const qTodaySlotReservations = query(
                 reservationsRef,
                 where('slot_date', '==', todayStr),
@@ -84,12 +97,6 @@ export default function AdminDashboard() {
                 return {
                     id: doc.id,
                     ...data,
-                    // We need student name. Since we don't join, we might need to fetch student or rely on denormalized student name if we added it.
-                    // We didn't add student name to reservation in SlotReservation.jsx.
-                    // So we need to fetch student names.
-                    // Or, for now, just show student ID or fetch them.
-                    // Let's fetch all students? No.
-                    // Let's fetch students involved in these reservations.
                 };
             });
 
@@ -97,14 +104,6 @@ export default function AdminDashboard() {
             const studentIds = [...new Set(reservationsData.map(r => r.student_id))];
             let studentsMap = {};
             if (studentIds.length > 0) {
-                // Firestore 'in' query supports up to 10. If more, we need to batch or fetch all.
-                // For dashboard, likely not too many students per day.
-                // But to be safe, let's just fetch all students for now (assuming < 1000 active students) or fetch individually.
-                // Or better: update SlotReservation to include student_name in reservation!
-                // But I already wrote SlotReservation without it.
-                // I will fetch students using 'in' batches or just one by one if few.
-                // Let's use 'in' for chunks of 10.
-
                 const chunks = [];
                 for (let i = 0; i < studentIds.length; i += 10) {
                     chunks.push(studentIds.slice(i, i + 10));
@@ -138,6 +137,7 @@ export default function AdminDashboard() {
 
         } catch (error) {
             console.error('Error loading data:', error);
+            // ユーザーに見えるアラートは出さない（statsなどは表示されるため）
         } finally {
             setLoading(false);
         }
@@ -146,6 +146,51 @@ export default function AdminDashboard() {
     const getTrainingTypeLabel = (type) => {
         const labels = { 'I': '臨床実習Ⅰ', 'II': '臨床実習Ⅱ', 'IV': '臨床実習Ⅳ' };
         return labels[type] || type;
+    };
+
+    const exportToCSV = async () => {
+        try {
+            // Fetch all reservations
+            const reservationsRef = collection(db, 'reservations');
+            const reservationsSnapshot = await getDocs(reservationsRef);
+            const reservations = reservationsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+            // Fetch all students for name lookup
+            const studentsRef = collection(db, 'students');
+            const studentsSnapshot = await getDocs(studentsRef);
+            const studentsMap = {};
+            studentsSnapshot.docs.forEach(doc => {
+                studentsMap[doc.id] = doc.data();
+            });
+
+            // Create CSV content
+            const headers = ['学籍番号', '氏名', '日付', '開始時間', '終了時間', '実習区分', 'ステータス', '実績時間(分)'];
+            const rows = reservations.map(r => {
+                const student = studentsMap[r.student_id] || {};
+                return [
+                    student.student_number || '',
+                    student.name || '',
+                    r.slot_date || '',
+                    r.custom_start_time || r.slot_start_time || '',
+                    r.custom_end_time || r.slot_end_time || '',
+                    r.slot_training_type || '',
+                    r.status || '',
+                    r.actual_minutes || ''
+                ].join(',');
+            });
+
+            const csv = [headers.join(','), ...rows].join('\n');
+            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' }); // BOM for Excel
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `reservations_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Export error:', error);
+            alert('エクスポートに失敗しました');
+        }
     };
 
     if (loading) {
@@ -157,10 +202,19 @@ export default function AdminDashboard() {
     }
 
     return (
-        <div className="space-y-8 pt-6">
-            <div>
-                <h1 className="text-3xl font-bold text-slate-900 tracking-tight">管理者ダッシュボード</h1>
-                <p className="text-slate-500 mt-2">システム全体の状況を確認できます</p>
+        <div className="space-y-8 pt-10">
+            <div className="flex justify-between items-start">
+                <div>
+                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">管理者ダッシュボード</h1>
+                    <p className="text-slate-500 mt-2">システム全体の状況を確認できます</p>
+                </div>
+                <button
+                    onClick={exportToCSV}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all hover:-translate-y-0.5"
+                >
+                    <Download className="w-4 h-4" />
+                    CSVエクスポート
+                </button>
             </div>
 
             {/* Stats Grid */}

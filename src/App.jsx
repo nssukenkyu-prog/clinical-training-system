@@ -24,18 +24,78 @@ import './index.css';
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [checkingRole, setCheckingRole] = useState(true);
   const [userRole, setUserRole] = useState(null); // 'student' | 'admin'
   const [userName, setUserName] = useState('');
 
+  const checkUserRole = async (currentUser) => {
+    if (!currentUser) {
+      setUserRole(null);
+      setUserName('');
+      setCheckingRole(false);
+      return;
+    }
+
+    try {
+      setCheckingRole(true);
+      // Check Admin by email
+      const adminsRef = collection(db, 'admins');
+      const qAdminEmail = query(adminsRef, where('email', '==', currentUser.email));
+      const adminSnapshot = await getDocs(qAdminEmail);
+
+      if (!adminSnapshot.empty) {
+        const adminData = adminSnapshot.docs[0].data();
+        setUserRole('admin');
+        setUserName(adminData.name || 'Admin');
+      } else {
+        // Check Student by email
+        const studentsRef = collection(db, 'students');
+        const qStudentEmail = query(studentsRef, where('email', '==', currentUser.email));
+        const studentSnapshot = await getDocs(qStudentEmail);
+
+        if (!studentSnapshot.empty) {
+          const studentData = studentSnapshot.docs[0].data();
+          setUserRole('student');
+          setUserName(studentData.name || 'Student');
+        } else {
+          setUserRole(null); // Unknown user
+        }
+      }
+    } catch (error) {
+      console.error("Failed to check user role:", error);
+    } finally {
+      setCheckingRole(false);
+    }
+  };
+
+  /* 
+     Fix: checkingRoleが永久にtrueのままになるのを防ぐため、
+     初期ロード完了後に強制的にfalseにするフェールセーフを入れる。 
+     また、onAuthStateChangedは信頼性が高いので、そこでの判定を主とする。
+  */
+  useEffect(() => {
+    // 5秒経ってもロードが終わらない場合は強制解除 (白画面対策)
+    const timer = setTimeout(() => {
+      if (loading || checkingRole) {
+        console.warn("Force ending loading state due to timeout");
+        setLoading(false);
+        setCheckingRole(false);
+      }
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [loading, checkingRole]);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+
       if (currentUser) {
-        setUser(currentUser);
-        await checkUserRole(currentUser.uid);
+        // ログイン状態なら役割を確認
+        await checkUserRole(currentUser);
       } else {
-        setUser(null);
+        // ログアウト状態なら役割なし
         setUserRole(null);
-        setUserName('');
+        setCheckingRole(false);
       }
       setLoading(false);
     });
@@ -43,49 +103,13 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-  const checkUserRole = async (userId) => {
-    // Check Admin
-    const adminsRef = collection(db, 'admins');
-    const qAdmin = query(adminsRef, where('auth_user_id', '==', userId)); // Assuming we keep auth_user_id or use doc ID
-    // Note: For migration, we might want to check by email if auth_user_id doesn't match Firebase UID yet, 
-    // but let's assume we are setting up fresh or migrating IDs. 
-    // For a fresh start with Firebase, we can query by email or ID.
-    // Let's query by email as a fallback or primary if ID not found? 
-    // Actually, best practice is to store the Firebase UID in the user document.
-    // Since we are migrating, let's assume the user document has a field 'uid' or we query by email.
-    // Let's stick to the plan: query 'admins' collection where 'email' matches (if we use email as link) or 'uid'.
-    // The previous code used 'auth_user_id'. Let's try to find a document where 'email' matches the current user's email.
-
-    const currentUser = auth.currentUser;
-    if (!currentUser) return;
-
-    // Check Admin by email (simpler for initial setup)
-    const qAdminEmail = query(adminsRef, where('email', '==', currentUser.email));
-    const adminSnapshot = await getDocs(qAdminEmail);
-
-    if (!adminSnapshot.empty) {
-      const adminData = adminSnapshot.docs[0].data();
-      setUserRole('admin');
-      setUserName(adminData.name || 'Admin');
-      return;
-    }
-
-    // Check Student by email
-    const studentsRef = collection(db, 'students');
-    const qStudentEmail = query(studentsRef, where('email', '==', currentUser.email));
-    const studentSnapshot = await getDocs(qStudentEmail);
-
-    if (!studentSnapshot.empty) {
-      const studentData = studentSnapshot.docs[0].data();
-      setUserRole('student');
-      setUserName(studentData.name || 'Student');
-    }
-  };
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-slate-500 text-sm font-medium animate-pulse">読み込み中...</p>
+        </div>
       </div>
     );
   }
@@ -95,14 +119,22 @@ function App() {
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<StudentEntry />} />
-        <Route path="/admin/login" element={!user ? <AdminLogin /> : <Navigate to="/admin/dashboard" replace />} />
+
+        {/* Admin Login - Always accessible if not admin */}
+        <Route
+          path="/admin/login"
+          element={
+            user && userRole === 'admin' ? <Navigate to="/admin/dashboard" replace /> : <AdminLogin />
+          }
+        />
 
         {/* Student Routes */}
         <Route
           path="/student/*"
           element={
-            sessionStorage.getItem('clinical_student_id') ? (
-              <Layout userRole="student" userName={sessionStorage.getItem('clinical_student_name') || 'Student'}>
+            // セッションIDがあるかどうかで判定 (Auth認証よりもセッションを優先して学生とみなす簡便な実装)
+            sessionStorage.getItem('clinical_student_id') || (user && userRole === 'student') ? (
+              <Layout userRole="student" userName={sessionStorage.getItem('clinical_student_name') || userName || 'Student'}>
                 <Routes>
                   <Route path="dashboard" element={<StudentDashboard />} />
                   <Route path="reservation" element={<SlotReservation />} />
@@ -115,10 +147,14 @@ function App() {
           }
         />
 
-        {/* Admin Routes */}
+        {/* Admin Protected Routes */}
         <Route
           path="/admin/*"
           element={
+            /* checkUserRole中（checkingRole=true）の場合は、まだリダイレクトしないようにローディングを出すべきだが、
+               ここではloading=falseになっている前提なので、userRoleを見る。
+               もし管理者としてログイン中なら表示、そうでなければログインへ。
+            */
             user && userRole === 'admin' ? (
               <Layout userRole="admin" userName={userName}>
                 <Routes>
@@ -139,7 +175,7 @@ function App() {
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </Router >
+    </Router>
   );
 }
 

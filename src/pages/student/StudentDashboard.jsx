@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { auth, db } from '../../lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc, orderBy } from 'firebase/firestore';
-import { Clock, Calendar, CheckCircle, AlertCircle, Plus } from 'lucide-react';
+import { collection, query, where, getDocs, doc, getDoc, deleteDoc } from 'firebase/firestore';
+import { Clock, Calendar, CheckCircle, AlertCircle, Plus, Trash2 } from 'lucide-react';
 import { clsx } from 'clsx';
 
 export default function StudentDashboard() {
     const [student, setStudent] = useState(null);
     const [reservations, setReservations] = useState([]);
     const [totalMinutes, setTotalMinutes] = useState(0);
+    const [reservedMinutes, setReservedMinutes] = useState(0);
     const [settings, setSettings] = useState(null);
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
@@ -23,6 +24,8 @@ export default function StudentDashboard() {
             const studentId = sessionStorage.getItem('clinical_student_id');
 
             if (!studentId) {
+                console.error("No studentId in session");
+                // alert("Debugging: No Session ID found"); 
                 navigate('/');
                 return;
             }
@@ -31,6 +34,8 @@ export default function StudentDashboard() {
             const studentDoc = await getDoc(doc(db, 'students', studentId));
 
             if (!studentDoc.exists()) {
+                console.error("Student doc not found for ID:", studentId);
+                alert(`エラー: 学生データが見つかりません (ID: ${studentId})`);
                 sessionStorage.clear();
                 navigate('/');
                 return;
@@ -39,25 +44,43 @@ export default function StudentDashboard() {
             const studentData = { id: studentDoc.id, ...studentDoc.data() };
             setStudent(studentData);
 
-            // 予約一覧を取得
+            // 予約一覧を取得（キャンセル以外）
             const reservationsRef = collection(db, 'reservations');
             const qReservations = query(
                 reservationsRef,
-                where('student_id', '==', studentId),
-                orderBy('slot_date', 'desc'),
-                orderBy('slot_start_time', 'desc')
+                where('student_id', '==', studentId)
             );
             const reservationsSnapshot = await getDocs(qReservations);
-            const reservationsData = reservationsSnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
+            const reservationsData = reservationsSnapshot.docs
+                .map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }))
+                .filter(r => r.status !== 'cancelled')
+                .sort((a, b) => {
+                    // Sort by date desc, then by time desc
+                    if (a.slot_date !== b.slot_date) return b.slot_date.localeCompare(a.slot_date);
+                    return (b.slot_start_time || '').localeCompare(a.slot_start_time || '');
+                });
             setReservations(reservationsData);
 
-            // 累積時間を計算
+            // Calculate Accumulated Minutes
+            // 1. Approved (Completed) - based on ACTUAL minutes
             const completed = reservationsData.filter(r => r.status === 'completed');
-            const total = completed.reduce((sum, r) => sum + (r.actual_minutes || 0), 0);
-            setTotalMinutes(total);
+            const totalApproved = completed.reduce((sum, r) => sum + (r.actual_minutes || 0), 0);
+            setTotalMinutes(totalApproved);
+
+            // 2. Reserved (Planned) - based on SCHEDULED duration of ALL active reservations (confirmed + completed)
+            // Even completed ones count towards "what was reserved" unless we strictly mean "future".
+            // User said: "Student reserved time... even after admin approves, this shouldn't disappear".
+            // So this metric tracks the cumulative time the student HAS reserved/attended.
+            const totalReserved = reservationsData.reduce((sum, r) => {
+                const start = new Date(`1970-01-01T${r.slot_start_time}`);
+                const end = new Date(`1970-01-01T${r.slot_end_time}`);
+                const duration = (end - start) / (1000 * 60); // minutes
+                return sum + (duration > 0 ? duration : 0);
+            }, 0);
+            setReservedMinutes(totalReserved);
 
             // システム設定を取得
             const settingsRef = collection(db, 'settings');
@@ -109,6 +132,67 @@ export default function StudentDashboard() {
         );
     };
 
+    const handleDeleteReservation = async (reservation) => {
+        // Check 12-hour rule
+        const slotStart = new Date(`${reservation.slot_date}T${reservation.slot_start_time}`);
+        const now = new Date();
+        const diffHours = (slotStart - now) / (1000 * 60 * 60);
+
+        if (diffHours < 12) {
+            alert('実習開始12時間前を切っているため、システムからのキャンセルはできません。\nTeams等で管理者へ直接ご連絡ください。');
+            return;
+        }
+
+        if (!window.confirm(`${formatDate(reservation.slot_date)} ${reservation.slot_start_time?.slice(0, 5) || ''} の予約を削除しますか？`)) {
+            return;
+        }
+        try {
+            await deleteDoc(doc(db, 'reservations', reservation.id));
+            // Remove from local state
+            setReservations(reservations.filter(r => r.id !== reservation.id));
+
+            // Email Notification
+            if (student?.email) {
+                try {
+                    const GAS_WEBHOOK_URL = import.meta.env.VITE_GAS_EMAIL_WEBHOOK_URL;
+                    if (GAS_WEBHOOK_URL) {
+                        await fetch(GAS_WEBHOOK_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            mode: 'no-cors',
+                            body: JSON.stringify({
+                                to: student.email,
+                                subject: '【臨床実習】予約キャンセルのお知らせ',
+                                body: `
+<!DOCTYPE html>
+<html>
+<body style="font-family: sans-serif; padding: 20px;">
+  <h2 style="color: #ef4444;">予約キャンセルのお知らせ</h2>
+  <p>${student.name} 様</p>
+  <p>以下の予約を取り消しました（ダッシュボード）。</p>
+  <div style="background: #fef2f2; padding: 15px; border-radius: 8px; border: 1px solid #fee2e2; margin: 20px 0;">
+    <ul style="list-style: none; padding: 0;">
+      <li style="margin-bottom: 8px;">📅 <b>日時:</b> ${formatDate(reservation.slot_date)} ${reservation.slot_start_time?.slice(0, 5)} - ${reservation.slot_end_time?.slice(0, 5)}</li>
+      <li>📋 <b>実習:</b> 臨床実習 ${reservation.slot_training_type}</li>
+    </ul>
+  </div>
+</body>
+</html>`
+                            })
+                        });
+                    }
+                } catch (e) {
+                    console.error('Email failed', e);
+                }
+            }
+
+            alert('予約を削除しました');
+        } catch (error) {
+            console.error('Error deleting reservation:', error);
+            alert('削除に失敗しました');
+        }
+    };
+
     const formatDate = (dateStr) => {
         if (!dateStr) return '';
         const date = new Date(dateStr);
@@ -125,7 +209,7 @@ export default function StudentDashboard() {
     }
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-8 pt-10">
             {/* Header Section */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -160,7 +244,7 @@ export default function StudentDashboard() {
 
                     <div className="mb-4">
                         <div className="flex justify-between text-sm mb-2">
-                            <span className="text-slate-500">達成率</span>
+                            <span className="text-slate-500">達成率 (承認ベース)</span>
                             <span className="font-bold text-xl text-slate-900">{Math.round(getProgressPercent())}%</span>
                         </div>
                         <div className="h-4 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
@@ -169,16 +253,27 @@ export default function StudentDashboard() {
                                 style={{ width: `${getProgressPercent()}%` }}
                             />
                         </div>
+                        <p className="text-xs text-slate-400 mt-2 text-right">
+                            ※実習進捗率は、管理者が実習完了を承認した後に更新されます。
+                        </p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 mt-6">
                         <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-                            <p className="text-sm text-slate-500 mb-1">現在の累積時間</p>
-                            <p className="text-2xl font-bold text-slate-900">{formatTime(totalMinutes)}</p>
+                            <p className="text-xs text-slate-500 mb-1">予約済み時間 (累積)</p>
+                            <p className="text-xl font-bold text-slate-900">{formatTime(reservedMinutes)}</p>
+                            <p className="text-[10px] text-slate-400 mt-1">※完了・承認含む全予約</p>
                         </div>
                         <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-                            <p className="text-sm text-slate-500 mb-1">必須時間</p>
-                            <p className="text-2xl font-bold text-slate-700">{formatTime(settings?.requiredMinutes || 1260)}</p>
+                            <p className="text-xs text-slate-500 mb-1">承認済み時間 (実績)</p>
+                            <p className="text-2xl font-bold text-slate-900">{formatTime(totalMinutes)}</p>
+                        </div>
+                    </div>
+
+                    <div className="mt-4 p-3 rounded-lg bg-slate-50 border border-slate-100">
+                        <div className="flex justify-between items-center">
+                            <span className="text-sm text-slate-500">必須時間</span>
+                            <span className="text-lg font-bold text-slate-700">{formatTime(settings?.requiredMinutes || 1260)}</span>
                         </div>
                     </div>
 
@@ -215,6 +310,7 @@ export default function StudentDashboard() {
                                     <th className="pb-4 font-medium">実習区分</th>
                                     <th className="pb-4 font-medium">ステータス</th>
                                     <th className="pb-4 font-medium">実習時間</th>
+                                    <th className="pb-4 font-medium">操作</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -238,6 +334,17 @@ export default function StudentDashboard() {
                                             {reservation.actual_minutes
                                                 ? formatTime(reservation.actual_minutes)
                                                 : '-'}
+                                        </td>
+                                        <td className="py-4">
+                                            {reservation.status === 'confirmed' && (
+                                                <button
+                                                    onClick={() => handleDeleteReservation(reservation)}
+                                                    className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                                                    title="予約を削除"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}

@@ -46,17 +46,17 @@ const Layout = ({ children, userRole, userName }) => {
             </div>
 
             {/* Sidebar (Desktop) */}
-            <aside className="fixed left-0 top-0 h-full w-64 bg-white/80 backdrop-blur-md border-r border-slate-200 z-20 hidden md:flex flex-col shadow-sm">
-                <div className="p-6 border-b border-slate-100">
-                    <h1 className="text-lg font-bold text-primary leading-tight">
+            <aside className="fixed left-0 top-0 h-full w-64 bg-gradient-to-b from-slate-50 to-white backdrop-blur-xl border-r border-slate-200/50 z-20 hidden md:flex flex-col shadow-xl">
+                <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700">
+                    <h1 className="text-lg font-bold text-white leading-tight drop-shadow-sm">
                         NSSU 令和8年度<br />臨床実習
                     </h1>
-                    <p className="text-xs text-slate-500 mt-1">
-                        {userRole === 'admin' ? '管理者ポータル' : '学生ポータル'}
+                    <p className="text-xs text-indigo-200 mt-1 font-medium">
+                        {userRole === 'admin' ? '👤 管理者ポータル' : '🎓 学生ポータル'}
                     </p>
                 </div>
 
-                <nav className="flex-1 p-4 space-y-2">
+                <nav className="flex-1 p-3 space-y-1.5 overflow-y-auto">
                     {navItems.map((item) => {
                         const Icon = item.icon;
                         const isActive = location.pathname === item.path;
@@ -65,14 +65,14 @@ const Layout = ({ children, userRole, userName }) => {
                                 key={item.path}
                                 to={item.path}
                                 className={clsx(
-                                    "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200",
+                                    "flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-all duration-200 text-sm",
                                     isActive
-                                        ? "bg-primary/10 text-primary font-bold shadow-sm"
-                                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                                        ? "bg-indigo-100 text-indigo-700 font-bold shadow-sm"
+                                        : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                                 )}
                             >
-                                <Icon className="w-5 h-5" />
-                                <span className="font-medium">{item.label}</span>
+                                <Icon className="w-4 h-4 flex-shrink-0" />
+                                <span className="font-medium truncate">{item.label}</span>
                             </Link>
                         );
                     })}

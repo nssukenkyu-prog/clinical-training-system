@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { auth, db } from '../../lib/firebase';
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, getDoc } from 'firebase/firestore';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, AlertCircle, X, List, LayoutGrid } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, AlertCircle, X, List, LayoutGrid, Info } from 'lucide-react';
 import { clsx } from 'clsx';
 
 export default function SlotReservation() {
@@ -17,7 +17,7 @@ export default function SlotReservation() {
     const [selectedSlot, setSelectedSlot] = useState(null);
     const [customStartTime, setCustomStartTime] = useState('');
     const [customEndTime, setCustomEndTime] = useState('');
-    const [viewMode, setViewMode] = useState('day'); // 'month' or 'day'
+    const [viewMode, setViewMode] = useState('month'); // 'month' or 'day'
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -144,6 +144,17 @@ export default function SlotReservation() {
 
     const handleReserve = (slot) => {
         if (!student || reserving) return;
+
+        // 12-hour Check
+        const slotStart = new Date(`${slot.date}T${slot.start_time}`);
+        const now = new Date();
+        const diffHours = (slotStart - now) / (1000 * 60 * 60);
+
+        if (diffHours < 12) {
+            alert('実習開始12時間前を切っているため、予約はできません。\nTeams等で管理者へ直接ご相談ください。');
+            return;
+        }
+
         const availability = getAvailability(slot);
         if (availability.remaining <= 0) { alert('この枠は満員です'); return; }
         if (isAlreadyReserved(slot)) { alert('既にこの枠を予約しています'); return; }
@@ -191,18 +202,92 @@ export default function SlotReservation() {
             };
             await addDoc(collection(db, 'reservations'), reservationData);
 
-            // Email Notification
+            // Email Notification via GAS
             if (student.email) {
                 try {
-                    await fetch('/api/send-email', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            to: student.email,
-                            subject: '【臨床実習】予約完了のお知らせ',
-                            body: `<p>${student.name} 様</p><p>以下の日程で予約を受け付けました。</p><ul><li>日時: ${slot.date} ${customStartTime} - ${customEndTime}</li><li>実習: ${slot.training_type}</li></ul><p>キャンセルはシステムから行ってください。</p>`
-                        })
-                    });
+                    const GAS_WEBHOOK_URL = import.meta.env.VITE_GAS_EMAIL_WEBHOOK_URL;
+                    if (GAS_WEBHOOK_URL) {
+                        await fetch(GAS_WEBHOOK_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            mode: 'no-cors', // GAS requires no-cors
+                            body: JSON.stringify({
+                                to: student.email,
+                                subject: '【臨床実習】予約完了のお知らせ',
+                                body: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f5f7fa;">
+  <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border-radius: 16px 16px 0 0; padding: 32px; text-align: center;">
+      <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 700;">NSSU 臨床実習予約システム</h1>
+      <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px;">予約完了のお知らせ</p>
+    </div>
+    
+    <!-- Content -->
+    <div style="background: white; padding: 32px; border-radius: 0 0 16px 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+      <p style="color: #1e293b; font-size: 16px; margin: 0 0 24px 0;">
+        <strong>${student.name}</strong> 様
+      </p>
+      
+      <p style="color: #64748b; font-size: 14px; margin: 0 0 24px 0; line-height: 1.6;">
+        以下の日程で実習予約を受け付けました。
+      </p>
+      
+      <!-- Reservation Details Card -->
+      <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-radius: 12px; padding: 24px; margin-bottom: 24px; border-left: 4px solid #6366f1;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 8px 0; color: #64748b; font-size: 13px; width: 80px;">📅 日付</td>
+            <td style="padding: 8px 0; color: #1e293b; font-size: 15px; font-weight: 600;">${slot.date}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #64748b; font-size: 13px;">⏰ 時間</td>
+            <td style="padding: 8px 0; color: #1e293b; font-size: 15px; font-weight: 600;">${customStartTime} - ${customEndTime}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; color: #64748b; font-size: 13px;">📋 区分</td>
+            <td style="padding: 8px 0; color: #1e293b; font-size: 15px; font-weight: 600;">臨床実習 ${slot.training_type}</td>
+          </tr>
+        </table>
+      </div>
+      
+      <!-- Notice -->
+      <div style="background: #fef3c7; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+        <p style="color: #92400e; font-size: 13px; margin: 0; line-height: 1.5;">
+          ⚠️ キャンセルや変更はシステムから行ってください。<br>
+          当日欠席の場合は、必ず事前にご連絡ください。
+        </p>
+      </div>
+      
+      <!-- Footer -->
+      <div style="border-top: 1px solid #e2e8f0; padding-top: 24px; text-align: center;">
+        <p style="color: #94a3b8; font-size: 12px; margin: 0;">
+          このメールは自動送信されています。<br>
+          ご不明な点がございましたら、担当者までお問い合わせください。
+        </p>
+      </div>
+    </div>
+    
+    <!-- Branding -->
+    <p style="text-align: center; color: #94a3b8; font-size: 11px; margin-top: 24px;">
+      © ${new Date().getFullYear()} NSSU 臨床実習予約システム
+    </p>
+  </div>
+</body>
+</html>
+                                `
+                            })
+                        });
+                        console.log('[Email] Sent via GAS webhook');
+                    } else {
+                        console.log('[Email] GAS webhook URL not configured, skipping email');
+                    }
                 } catch (e) { console.error('Email failed', e); }
             }
 
@@ -235,15 +320,33 @@ export default function SlotReservation() {
             // Email Notification
             if (student.email) {
                 try {
-                    await fetch('/api/send-email', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            to: student.email,
-                            subject: '【臨床実習】予約キャンセルのお知らせ',
-                            body: `<p>${student.name} 様</p><p>以下の予約をキャンセルしました。</p><ul><li>日時: ${slot.date} ${slot.start_time.slice(0, 5)} - ${slot.end_time.slice(0, 5)}</li><li>実習: ${slot.training_type}</li></ul>`
-                        })
-                    });
+                    const GAS_WEBHOOK_URL = import.meta.env.VITE_GAS_EMAIL_WEBHOOK_URL;
+                    if (GAS_WEBHOOK_URL) {
+                        await fetch(GAS_WEBHOOK_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            mode: 'no-cors',
+                            body: JSON.stringify({
+                                to: student.email,
+                                subject: '【臨床実習】予約キャンセルのお知らせ',
+                                body: `
+<!DOCTYPE html>
+<html>
+<body style="font-family: sans-serif; padding: 20px;">
+  <h2 style="color: #ef4444;">予約キャンセルのお知らせ</h2>
+  <p>${student.name} 様</p>
+  <p>以下の予約を取り消しました。</p>
+  <div style="background: #fef2f2; padding: 15px; border-radius: 8px; border: 1px solid #fee2e2; margin: 20px 0;">
+    <ul style="list-style: none; padding: 0;">
+      <li style="margin-bottom: 8px;">📅 <b>日時:</b> ${slot.date} ${slot.start_time.slice(0, 5)} - ${slot.end_time.slice(0, 5)}</li>
+      <li>📋 <b>実習:</b> 臨床実習 ${slot.training_type}</li>
+    </ul>
+  </div>
+</body>
+</html>`
+                            })
+                        });
+                    }
                 } catch (e) { console.error('Email failed', e); }
             }
 
@@ -291,11 +394,17 @@ export default function SlotReservation() {
     const selectedDateSlots = getSlotsForDate(selectedDate);
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-8 pt-10">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900">実習予約</h1>
                     <p className="text-slate-500 mt-1">希望する日時を選択してください</p>
+                    {student && (
+                        <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-sm font-bold border border-indigo-100">
+                            <Info className="w-4 h-4" />
+                            <span>対象区分: 臨床実習{student.training_type}</span>
+                        </div>
+                    )}
                 </div>
                 <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
                     <button
@@ -323,9 +432,16 @@ export default function SlotReservation() {
                             <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))} className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-600">
                                 <ChevronLeft className="w-5 h-5" />
                             </button>
-                            <h2 className="text-xl font-bold text-slate-900">
-                                {currentMonth.getFullYear()}年 {currentMonth.getMonth() + 1}月
-                            </h2>
+                            <div className="text-center">
+                                <h2 className="text-xl font-bold text-slate-900">
+                                    {currentMonth.getFullYear()}年 {currentMonth.getMonth() + 1}月
+                                </h2>
+                                <div className="flex items-center justify-center gap-3 mt-2 text-xs text-slate-500 font-medium">
+                                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-100 border border-blue-200"></span>空きあり</span>
+                                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-white border border-slate-200"></span>予定なし/過去</span>
+                                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary border border-primary"></span>選択中</span>
+                                </div>
+                            </div>
                             <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))} className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-600">
                                 <ChevronRight className="w-5 h-5" />
                             </button>
@@ -348,21 +464,19 @@ export default function SlotReservation() {
                                         onClick={() => {
                                             if (!isPast && hasSlots) {
                                                 setSelectedDate(date);
-                                                // Optional: Switch to day view on click?
-                                                // setViewMode('day'); 
                                             }
                                         }}
                                         disabled={isPast || !hasSlots}
                                         className={clsx(
                                             "aspect-square rounded-xl flex flex-col items-center justify-center relative transition-all border",
-                                            isSelected ? "bg-primary text-white shadow-md border-primary scale-105" :
-                                                hasSlots ? "bg-blue-50 hover:bg-blue-100 text-slate-700 cursor-pointer border-blue-100" :
-                                                    "bg-white text-slate-300 border-slate-100 cursor-default"
+                                            isSelected ? "bg-primary text-white shadow-md border-primary scale-105 z-10" :
+                                                hasSlots && !isPast ? "bg-blue-50/80 hover:bg-blue-100 text-slate-700 cursor-pointer border-blue-200/60 hover:border-blue-300" :
+                                                    "bg-slate-50/50 text-slate-300 border-slate-100 cursor-default"
                                         )}
                                     >
-                                        <span className="text-lg font-medium">{date.getDate()}</span>
-                                        {hasSlots && !isSelected && (
-                                            <span className="text-[10px] text-blue-600 mt-1 font-bold">{dateSlots.length}枠</span>
+                                        <span className={clsx("text-lg font-medium", isPast && "opacity-50")}>{date.getDate()}</span>
+                                        {hasSlots && !isSelected && !isPast && (
+                                            <span className="text-[10px] text-blue-600 mt-1 font-bold bg-blue-100/50 px-1.5 py-0.5 rounded-full">{dateSlots.length}枠</span>
                                         )}
                                     </button>
                                 );
@@ -462,43 +576,109 @@ export default function SlotReservation() {
     );
 }
 
-const SlotCard = ({ slot, availability, reserved, onReserve, onCancel, reserving }) => (
-    <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all">
-        <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-slate-50 text-slate-600">
-                    <Clock className="w-5 h-5" />
+const SlotCard = ({ slot, availability, reserved, onReserve, onCancel, reserving }) => {
+    const getTrainingTypeColor = (type) => {
+        const colors = {
+            'I': 'bg-blue-100 text-blue-700 border-blue-200',
+            'II': 'bg-emerald-100 text-emerald-700 border-emerald-200',
+            'IV': 'bg-purple-100 text-purple-700 border-purple-200'
+        };
+        return colors[type] || 'bg-slate-100 text-slate-600 border-slate-200';
+    };
+
+    const getTrainingTypeLabel = (type) => {
+        const labels = { 'I': '実習Ⅰ', 'II': '実習Ⅱ', 'IV': '実習Ⅳ' };
+        return labels[type] || type;
+    };
+
+    const slotStart = new Date(`${slot.date}T${slot.start_time}`);
+    const now = new Date();
+    const diffHours = (slotStart - now) / (1000 * 60 * 60);
+    const isPastDeadline = diffHours < 12;
+
+    return (
+        <div className={clsx(
+            "p-5 rounded-2xl border-2 shadow-sm hover:shadow-lg transition-all duration-300",
+            reserved
+                ? "bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-300"
+                : "bg-white border-slate-200 hover:border-indigo-300"
+        )}>
+            {/* Header with time and training type */}
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                    <div className={clsx(
+                        "p-2.5 rounded-xl",
+                        reserved ? "bg-blue-100 text-blue-600" : "bg-slate-100 text-slate-600"
+                    )}>
+                        <Clock className="w-5 h-5" />
+                    </div>
+                    <div>
+                        <span className="block text-xl font-bold text-slate-900 leading-none mb-1">
+                            {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
+                        </span>
+                        <span className={clsx(
+                            "text-xs font-bold px-2 py-0.5 rounded-full border",
+                            getTrainingTypeColor(slot.training_type)
+                        )}>
+                            {getTrainingTypeLabel(slot.training_type)}
+                        </span>
+                    </div>
                 </div>
-                <div>
-                    <span className="block text-lg font-bold text-slate-900 leading-none mb-1">
-                        {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
-                    </span>
-                    <span className="text-xs text-slate-500 font-medium">実習時間</span>
-                </div>
+                <span className={clsx("text-xs font-bold px-3 py-1.5 rounded-full border", availability.color)}>
+                    {availability.label}
+                </span>
             </div>
-            <span className={clsx("text-xs font-bold px-3 py-1.5 rounded-full border", availability.color)}>
-                {availability.label}
-            </span>
-        </div>
 
-        <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-            <span className="text-sm text-slate-500 font-medium">
-                残り <span className="text-slate-900 text-base">{availability.remaining}</span> 枠
-            </span>
+            {/* Footer with remaining slots and action */}
+            <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                <div className="flex items-center gap-2">
+                    <span className="text-sm text-slate-500">残り</span>
+                    <span className={clsx(
+                        "text-lg font-bold",
+                        availability.remaining > 2 ? "text-emerald-600" : availability.remaining > 0 ? "text-amber-600" : "text-slate-400"
+                    )}>
+                        {availability.remaining}
+                    </span>
+                    <span className="text-sm text-slate-500">枠</span>
+                </div>
 
-            {reserved ? (
-                <button onClick={onCancel} className="px-5 py-2.5 rounded-lg bg-rose-50 text-rose-600 text-sm font-bold border border-rose-100 hover:bg-rose-100 transition-colors">
-                    キャンセル
-                </button>
-            ) : availability.remaining > 0 ? (
-                <button onClick={onReserve} disabled={reserving} className="px-5 py-2.5 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-colors shadow-md shadow-primary/20">
-                    {reserving ? '処理中...' : '予約する'}
-                </button>
-            ) : (
-                <button disabled className="px-5 py-2.5 rounded-lg bg-slate-100 text-slate-400 text-sm font-bold border border-slate-200 cursor-not-allowed">
-                    満員
-                </button>
-            )}
+                {reserved ? (
+                    <button
+                        onClick={onCancel}
+                        className={clsx(
+                            "px-5 py-2.5 rounded-xl text-white text-sm font-bold shadow-md transition-all",
+                            isPastDeadline
+                                ? "bg-slate-400 shadow-none cursor-not-allowed opacity-70"
+                                : "bg-gradient-to-r from-rose-500 to-pink-500 shadow-rose-500/20 hover:shadow-rose-500/40 hover:-translate-y-0.5"
+                        )}
+                        disabled={isPastDeadline}
+                        title={isPastDeadline ? "キャンセル期限を過ぎています" : ""}
+                    >
+                        {isPastDeadline ? '期限終了' : 'キャンセル'}
+                    </button>
+                ) : availability.remaining > 0 ? (
+                    <button
+                        onClick={onReserve}
+                        disabled={reserving || isPastDeadline}
+                        className={clsx(
+                            "px-5 py-2.5 rounded-xl text-white text-sm font-bold shadow-md transition-all",
+                            isPastDeadline
+                                ? "bg-slate-300 shadow-none cursor-not-allowed text-slate-500"
+                                : "bg-gradient-to-r from-indigo-500 to-purple-500 shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5"
+                        )}
+                        title={isPastDeadline ? "予約期限を過ぎています" : ""}
+                    >
+                        {reserving ? '処理中...' : isPastDeadline ? '受付終了' : '予約する'}
+                    </button>
+                ) : (
+                    <button
+                        disabled
+                        className="px-5 py-2.5 rounded-xl bg-slate-100 text-slate-400 text-sm font-bold border border-slate-200 cursor-not-allowed"
+                    >
+                        満員
+                    </button>
+                )}
+            </div>
         </div>
-    </div>
-);
+    );
+};

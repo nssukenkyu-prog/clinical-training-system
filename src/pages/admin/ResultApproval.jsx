@@ -120,15 +120,35 @@ export default function ResultApproval() {
             // Email Notification
             if (reservation.student.email) {
                 try {
-                    await fetch('/api/send-email', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            to: reservation.student.email,
-                            subject: '【臨床実習】実習承認のお知らせ',
-                            body: `<p>${reservation.student.name} 様</p><p>以下の実習が承認されました。</p><ul><li>日時: ${formatDate(reservation.slot.date)} ${reservation.slot.start_time.slice(0, 5)} - ${reservation.slot.end_time.slice(0, 5)}</li><li>実習: ${reservation.slot.training_type}</li><li>実績時間: ${Math.floor(actualMinutes / 60)}時間${actualMinutes % 60}分</li></ul>`
-                        })
-                    });
+                    const GAS_WEBHOOK_URL = import.meta.env.VITE_GAS_EMAIL_WEBHOOK_URL;
+                    if (GAS_WEBHOOK_URL) {
+                        await fetch(GAS_WEBHOOK_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            mode: 'no-cors',
+                            body: JSON.stringify({
+                                to: reservation.student.email,
+                                subject: '【臨床実習】実習承認のお知らせ',
+                                body: `
+<!DOCTYPE html>
+<html>
+<body style="font-family: sans-serif; padding: 20px;">
+  <h2 style="color: #4f46e5;">実習承認のお知らせ</h2>
+  <p>${reservation.student.name} 様</p>
+  <p>以下の実習実績が承認されました。</p>
+  <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin: 20px 0;">
+    <ul style="list-style: none; padding: 0;">
+      <li style="margin-bottom: 8px;">📅 <b>日時:</b> ${formatDate(reservation.slot.date)} ${reservation.slot.start_time.slice(0, 5)} - ${reservation.slot.end_time.slice(0, 5)}</li>
+      <li style="margin-bottom: 8px;">📋 <b>実習:</b> 臨床実習 ${reservation.slot.training_type}</li>
+      <li>⏱ <b>認定時間:</b> ${Math.floor(actualMinutes / 60)}時間${actualMinutes % 60}分</li>
+    </ul>
+  </div>
+  <p style="color: #64748b; font-size: 0.9em;">※マイページで累積時間を確認できます。</p>
+</body>
+</html>`
+                            })
+                        });
+                    }
                 } catch (e) {
                     console.error('Email failed', e);
                 }
@@ -169,7 +189,7 @@ export default function ResultApproval() {
     // formatDate is moved to module scope
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-8 pt-10">
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900">実績承認</h1>
