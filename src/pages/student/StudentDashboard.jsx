@@ -122,6 +122,42 @@ export default function StudentDashboard() {
             await deleteDoc(doc(db, 'reservations', reservation.id));
             // Remove from local state
             setReservations(reservations.filter(r => r.id !== reservation.id));
+
+            // Email Notification
+            if (student?.email) {
+                try {
+                    const GAS_WEBHOOK_URL = import.meta.env.VITE_GAS_EMAIL_WEBHOOK_URL;
+                    if (GAS_WEBHOOK_URL) {
+                        await fetch(GAS_WEBHOOK_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            mode: 'no-cors',
+                            body: JSON.stringify({
+                                to: student.email,
+                                subject: '【臨床実習】予約キャンセルのお知らせ',
+                                body: `
+<!DOCTYPE html>
+<html>
+<body style="font-family: sans-serif; padding: 20px;">
+  <h2 style="color: #ef4444;">予約キャンセルのお知らせ</h2>
+  <p>${student.name} 様</p>
+  <p>以下の予約を取り消しました（ダッシュボード）。</p>
+  <div style="background: #fef2f2; padding: 15px; border-radius: 8px; border: 1px solid #fee2e2; margin: 20px 0;">
+    <ul style="list-style: none; padding: 0;">
+      <li style="margin-bottom: 8px;">📅 <b>日時:</b> ${formatDate(reservation.slot_date)} ${reservation.slot_start_time?.slice(0, 5)} - ${reservation.slot_end_time?.slice(0, 5)}</li>
+      <li>📋 <b>実習:</b> 臨床実習 ${reservation.slot_training_type}</li>
+    </ul>
+  </div>
+</body>
+</html>`
+                            })
+                        });
+                    }
+                } catch (e) {
+                    console.error('Email failed', e);
+                }
+            }
+
             alert('予約を削除しました');
         } catch (error) {
             console.error('Error deleting reservation:', error);
