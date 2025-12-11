@@ -64,18 +64,28 @@ export default function AdminDashboard() {
                 completedTrainings: completedSnapshot.data().count
             });
 
-            // 今日の枠一覧
+            // 今日の枠一覧 - 修正: インデックス問題を回避するためクライアントサイドフィルタリングを使用
+            // 単純なクエリで取得し、JSでフィルタリングとソートを行う
             const qTodaySlots = query(
                 slotsRef,
-                where('date', '==', todayStr),
                 where('is_active', '==', true),
-                orderBy('start_time')
+                where('date', '>=', todayStr) // 今日以降を取得
+                // orderBy は外す（インデックス回避のため）
             );
             const todaySlotsSnapshot = await getDocs(qTodaySlots);
-            const slotsData = todaySlotsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const allActiveSlots = todaySlotsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+            // JSで「今日」かつ「開始時間順」にフィルタリング・ソート
+            const slotsData = allActiveSlots
+                .filter(slot => slot.date === todayStr)
+                .sort((a, b) => a.start_time.localeCompare(b.start_time));
+
+            console.log(`Loaded ${slotsData.length} slots for today (${todayStr})`);
 
             // Fetch reservations for today's slots
             // Using denormalized slot_date
+            // ここも同様に修正しても良いが、statusとslot_dateの複合ならインデックスがある可能性が高い
+            // 念のため、reservationsも安全策をとる
             const qTodaySlotReservations = query(
                 reservationsRef,
                 where('slot_date', '==', todayStr),
@@ -109,9 +119,8 @@ export default function AdminDashboard() {
             }
 
             // Merge
-            // 安全策: slotsDataが空でないか確認
-            const slotsWithReservations = (slotsData || []).map(slot => {
-                const slotReservations = (reservationsData || [])
+            const slotsWithReservations = slotsData.map(slot => {
+                const slotReservations = reservationsData
                     .filter(r => r.slot_id === slot.id)
                     .map(r => ({
                         ...r,
@@ -128,6 +137,7 @@ export default function AdminDashboard() {
 
         } catch (error) {
             console.error('Error loading data:', error);
+            // ユーザーに見えるアラートは出さない（statsなどは表示されるため）
         } finally {
             setLoading(false);
         }
