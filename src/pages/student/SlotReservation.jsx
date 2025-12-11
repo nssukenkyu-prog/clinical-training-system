@@ -144,6 +144,17 @@ export default function SlotReservation() {
 
     const handleReserve = (slot) => {
         if (!student || reserving) return;
+
+        // 12-hour Check
+        const slotStart = new Date(`${slot.date}T${slot.start_time}`);
+        const now = new Date();
+        const diffHours = (slotStart - now) / (1000 * 60 * 60);
+
+        if (diffHours < 12) {
+            alert('実習開始12時間前を切っているため、予約はできません。\nTeams等で管理者へ直接ご相談ください。');
+            return;
+        }
+
         const availability = getAvailability(slot);
         if (availability.remaining <= 0) { alert('この枠は満員です'); return; }
         if (isAlreadyReserved(slot)) { alert('既にこの枠を予約しています'); return; }
@@ -421,9 +432,16 @@ export default function SlotReservation() {
                             <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))} className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-600">
                                 <ChevronLeft className="w-5 h-5" />
                             </button>
-                            <h2 className="text-xl font-bold text-slate-900">
-                                {currentMonth.getFullYear()}年 {currentMonth.getMonth() + 1}月
-                            </h2>
+                            <div className="text-center">
+                                <h2 className="text-xl font-bold text-slate-900">
+                                    {currentMonth.getFullYear()}年 {currentMonth.getMonth() + 1}月
+                                </h2>
+                                <div className="flex items-center justify-center gap-3 mt-2 text-xs text-slate-500 font-medium">
+                                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-100 border border-blue-200"></span>空きあり</span>
+                                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-white border border-slate-200"></span>予定なし/過去</span>
+                                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary border border-primary"></span>選択中</span>
+                                </div>
+                            </div>
                             <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))} className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-600">
                                 <ChevronRight className="w-5 h-5" />
                             </button>
@@ -446,21 +464,19 @@ export default function SlotReservation() {
                                         onClick={() => {
                                             if (!isPast && hasSlots) {
                                                 setSelectedDate(date);
-                                                // Optional: Switch to day view on click?
-                                                // setViewMode('day'); 
                                             }
                                         }}
                                         disabled={isPast || !hasSlots}
                                         className={clsx(
                                             "aspect-square rounded-xl flex flex-col items-center justify-center relative transition-all border",
-                                            isSelected ? "bg-primary text-white shadow-md border-primary scale-105" :
-                                                hasSlots ? "bg-blue-50 hover:bg-blue-100 text-slate-700 cursor-pointer border-blue-100" :
-                                                    "bg-white text-slate-300 border-slate-100 cursor-default"
+                                            isSelected ? "bg-primary text-white shadow-md border-primary scale-105 z-10" :
+                                                hasSlots && !isPast ? "bg-blue-50/80 hover:bg-blue-100 text-slate-700 cursor-pointer border-blue-200/60 hover:border-blue-300" :
+                                                    "bg-slate-50/50 text-slate-300 border-slate-100 cursor-default"
                                         )}
                                     >
-                                        <span className="text-lg font-medium">{date.getDate()}</span>
-                                        {hasSlots && !isSelected && (
-                                            <span className="text-[10px] text-blue-600 mt-1 font-bold">{dateSlots.length}枠</span>
+                                        <span className={clsx("text-lg font-medium", isPast && "opacity-50")}>{date.getDate()}</span>
+                                        {hasSlots && !isSelected && !isPast && (
+                                            <span className="text-[10px] text-blue-600 mt-1 font-bold bg-blue-100/50 px-1.5 py-0.5 rounded-full">{dateSlots.length}枠</span>
                                         )}
                                     </button>
                                 );
@@ -575,6 +591,11 @@ const SlotCard = ({ slot, availability, reserved, onReserve, onCancel, reserving
         return labels[type] || type;
     };
 
+    const slotStart = new Date(`${slot.date}T${slot.start_time}`);
+    const now = new Date();
+    const diffHours = (slotStart - now) / (1000 * 60 * 60);
+    const isPastDeadline = diffHours < 12;
+
     return (
         <div className={clsx(
             "p-5 rounded-2xl border-2 shadow-sm hover:shadow-lg transition-all duration-300",
@@ -624,17 +645,30 @@ const SlotCard = ({ slot, availability, reserved, onReserve, onCancel, reserving
                 {reserved ? (
                     <button
                         onClick={onCancel}
-                        className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-pink-500 text-white text-sm font-bold shadow-md shadow-rose-500/20 hover:shadow-rose-500/40 transition-all hover:-translate-y-0.5"
+                        className={clsx(
+                            "px-5 py-2.5 rounded-xl text-white text-sm font-bold shadow-md transition-all",
+                            isPastDeadline
+                                ? "bg-slate-400 shadow-none cursor-not-allowed opacity-70"
+                                : "bg-gradient-to-r from-rose-500 to-pink-500 shadow-rose-500/20 hover:shadow-rose-500/40 hover:-translate-y-0.5"
+                        )}
+                        disabled={isPastDeadline}
+                        title={isPastDeadline ? "キャンセル期限を過ぎています" : ""}
                     >
-                        キャンセル
+                        {isPastDeadline ? '期限終了' : 'キャンセル'}
                     </button>
                 ) : availability.remaining > 0 ? (
                     <button
                         onClick={onReserve}
-                        disabled={reserving}
-                        className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-sm font-bold shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/40 transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
+                        disabled={reserving || isPastDeadline}
+                        className={clsx(
+                            "px-5 py-2.5 rounded-xl text-white text-sm font-bold shadow-md transition-all",
+                            isPastDeadline
+                                ? "bg-slate-300 shadow-none cursor-not-allowed text-slate-500"
+                                : "bg-gradient-to-r from-indigo-500 to-purple-500 shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5"
+                        )}
+                        title={isPastDeadline ? "予約期限を過ぎています" : ""}
                     >
-                        {reserving ? '処理中...' : '予約する'}
+                        {reserving ? '処理中...' : isPastDeadline ? '受付終了' : '予約する'}
                     </button>
                 ) : (
                     <button

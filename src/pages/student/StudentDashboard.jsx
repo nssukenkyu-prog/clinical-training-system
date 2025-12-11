@@ -133,6 +133,16 @@ export default function StudentDashboard() {
     };
 
     const handleDeleteReservation = async (reservation) => {
+        // Check 12-hour rule
+        const slotStart = new Date(`${reservation.slot_date}T${reservation.slot_start_time}`);
+        const now = new Date();
+        const diffHours = (slotStart - now) / (1000 * 60 * 60);
+
+        if (diffHours < 12) {
+            alert('実習開始12時間前を切っているため、システムからのキャンセルはできません。\nTeams等で管理者へ直接ご連絡ください。');
+            return;
+        }
+
         if (!window.confirm(`${formatDate(reservation.slot_date)} ${reservation.slot_start_time?.slice(0, 5) || ''} の予約を削除しますか？`)) {
             return;
         }
