@@ -1,19 +1,23 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db, auth } from '../../lib/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { signInAnonymously } from 'firebase/auth';
-import { User, ArrowRight, Activity, ShieldCheck, GraduationCap } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { collection, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { User, ArrowRight, Activity, ShieldCheck, GraduationCap, Lock, Key } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function StudentEntry() {
+    const [step, setStep] = useState('check'); // 'check', 'login', 'register'
     const [studentNumber, setStudentNumber] = useState('');
     const [name, setName] = useState('');
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [studentData, setStudentData] = useState(null);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
-    const handleEntry = async (e) => {
+    const handleCheck = async (e) => {
         e.preventDefault();
         setError('');
         setLoading(true);
@@ -30,11 +34,10 @@ export default function StudentEntry() {
                 return;
             }
 
-            // 2. 氏名の一致確認 (簡易チェック: 空白除去して比較)
-            const studentDoc = querySnapshot.docs[0];
-            const studentData = studentDoc.data();
-
-            const dbName = studentData.name.replace(/\s+/g, '');
+            // 2. 氏名の一致確認
+            const docSnapshot = querySnapshot.docs[0];
+            const data = docSnapshot.data();
+            const dbName = data.name.replace(/\s+/g, '');
             const inputName = name.replace(/\s+/g, '');
 
             if (dbName !== inputName) {
@@ -43,19 +46,85 @@ export default function StudentEntry() {
                 return;
             }
 
-            // 3. 匿名ログイン
-            await signInAnonymously(auth);
+            setStudentData({ id: docSnapshot.id, ...data });
 
-            // 4. セッションに保存
-            sessionStorage.setItem('clinical_student_id', studentDoc.id);
-            sessionStorage.setItem('clinical_student_name', studentData.name);
-
-            // 5. ダッシュボードへ移動
-            navigate('/student/dashboard');
+            // 3. パスワード設定状況で分岐
+            if (data.password_set) {
+                setStep('login');
+            } else {
+                setStep('register');
+            }
 
         } catch (err) {
             console.error(err);
-            setError('エラーが発生しました。もう一度お試しください。');
+            setError('エラーが発生しました。');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleLogin = async (e) => {
+        e.preventDefault();
+        setError('');
+        setLoading(true);
+
+        try {
+            await signInWithEmailAndPassword(auth, studentData.email, password);
+
+            // セッション保存
+            sessionStorage.setItem('clinical_student_id', studentData.id);
+            sessionStorage.setItem('clinical_student_name', studentData.name);
+
+            navigate('/student/dashboard');
+        } catch (err) {
+            console.error(err);
+            if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
+                setError('パスワードが正しくありません。');
+            } else {
+                setError('ログインに失敗しました。');
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleRegister = async (e) => {
+        e.preventDefault();
+        setError('');
+
+        if (password.length < 6) {
+            setError('パスワードは6文字以上で設定してください。');
+            return;
+        }
+        if (password !== confirmPassword) {
+            setError('パスワードが一致しません。');
+            return;
+        }
+
+        setLoading(true);
+
+        try {
+            // Firebase Auth作成
+            const userCredential = await createUserWithEmailAndPassword(auth, studentData.email, password);
+
+            // Firestore更新
+            await updateDoc(doc(db, 'students', studentData.id), {
+                password_set: true,
+                auth_user_id: userCredential.user.uid
+            });
+
+            // セッション保存
+            sessionStorage.setItem('clinical_student_id', studentData.id);
+            sessionStorage.setItem('clinical_student_name', studentData.name);
+
+            navigate('/student/dashboard');
+        } catch (err) {
+            console.error(err);
+            if (err.code === 'auth/email-already-in-use') {
+                setError('このメールアドレスは既に使用されています。管理者にお問い合わせください。');
+            } else {
+                setError('アカウント作成に失敗しました。');
+            }
         } finally {
             setLoading(false);
         }
@@ -109,86 +178,189 @@ export default function StudentEntry() {
                 </div>
             </div>
 
-            {/* Right Side - Login Form */}
+            {/* Right Side - Form */}
             <div className="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-12 relative">
                 <div className="w-full max-w-md">
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.5, delay: 0.2 }}
-                    >
-                        <div className="mb-10">
-                            <h2 className="text-3xl font-bold text-slate-900 mb-2">ログイン</h2>
-                            <p className="text-slate-500">学籍番号と氏名を入力してください</p>
-                        </div>
-
-                        {error && (
+                    <AnimatePresence mode="wait">
+                        {step === 'check' && (
                             <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-100 text-rose-600 text-sm flex items-center gap-3"
+                                key="check"
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -20 }}
+                                transition={{ duration: 0.3 }}
                             >
-                                <div className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
-                                {error}
+                                <div className="mb-10">
+                                    <h2 className="text-3xl font-bold text-slate-900 mb-2">ログイン</h2>
+                                    <p className="text-slate-500">学籍番号と氏名を入力してください</p>
+                                </div>
+
+                                {error && (
+                                    <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-100 text-rose-600 text-sm flex items-center gap-3">
+                                        <div className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                                        {error}
+                                    </div>
+                                )}
+
+                                <form onSubmit={handleCheck} className="space-y-6">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-bold text-slate-700">学籍番号</label>
+                                        <input
+                                            type="text"
+                                            className="w-full pl-4 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white text-slate-900 font-mono transition-all duration-200"
+                                            placeholder="2024001"
+                                            value={studentNumber}
+                                            onChange={(e) => setStudentNumber(e.target.value)}
+                                            required
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-bold text-slate-700">氏名</label>
+                                        <input
+                                            type="text"
+                                            className="w-full pl-4 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white text-slate-900 transition-all duration-200"
+                                            placeholder="日体 太郎"
+                                            value={name}
+                                            onChange={(e) => setName(e.target.value)}
+                                            required
+                                        />
+                                    </div>
+
+                                    <button
+                                        type="submit"
+                                        disabled={loading}
+                                        className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all duration-200 disabled:opacity-70 flex items-center justify-center gap-2"
+                                    >
+                                        {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><span>次へ</span><ArrowRight className="w-4 h-4" /></>}
+                                    </button>
+                                </form>
                             </motion.div>
                         )}
 
-                        <form onSubmit={handleEntry} className="space-y-6">
-                            <div className="space-y-2">
-                                <label className="text-sm font-bold text-slate-700">学籍番号</label>
-                                <div className="relative">
-                                    <input
-                                        type="text"
-                                        className="w-full pl-4 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white text-slate-900 font-mono transition-all duration-200 placeholder:text-slate-400"
-                                        placeholder="2024001"
-                                        value={studentNumber}
-                                        onChange={(e) => setStudentNumber(e.target.value)}
-                                        required
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-sm font-bold text-slate-700">氏名</label>
-                                <div className="relative">
-                                    <input
-                                        type="text"
-                                        className="w-full pl-4 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white text-slate-900 transition-all duration-200 placeholder:text-slate-400"
-                                        placeholder="日体 太郎"
-                                        value={name}
-                                        onChange={(e) => setName(e.target.value)}
-                                        required
-                                    />
-                                </div>
-                                <p className="text-xs text-slate-400">※ 登録氏名と完全に一致する必要があります</p>
-                            </div>
-
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 active:scale-[0.98] transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
+                        {step === 'login' && (
+                            <motion.div
+                                key="login"
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -20 }}
+                                transition={{ duration: 0.3 }}
                             >
-                                {loading ? (
-                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                ) : (
-                                    <>
-                                        <span>実習を開始する</span>
-                                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                                    </>
+                                <div className="mb-10">
+                                    <button onClick={() => setStep('check')} className="text-sm text-slate-400 hover:text-slate-600 mb-4 flex items-center gap-1">← 戻る</button>
+                                    <h2 className="text-3xl font-bold text-slate-900 mb-2">パスワード入力</h2>
+                                    <p className="text-slate-500">おかえりなさい、{name}さん</p>
+                                </div>
+
+                                {error && (
+                                    <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-100 text-rose-600 text-sm flex items-center gap-3">
+                                        <div className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                                        {error}
+                                    </div>
                                 )}
-                            </button>
-                        </form>
 
-                        <div className="mt-12 pt-6 border-t border-slate-100 text-center">
-                            <p className="text-xs text-slate-400 mb-4">管理者の方はこちら</p>
-                            <a
-                                href="/admin/login"
-                                className="inline-flex items-center justify-center px-6 py-2 rounded-lg bg-slate-50 text-slate-600 text-sm font-medium hover:bg-slate-100 transition-colors"
+                                <form onSubmit={handleLogin} className="space-y-6">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-bold text-slate-700">パスワード</label>
+                                        <div className="relative">
+                                            <Lock className="absolute left-4 top-4 w-5 h-5 text-slate-400" />
+                                            <input
+                                                type="password"
+                                                className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white text-slate-900 transition-all duration-200"
+                                                placeholder="••••••••"
+                                                value={password}
+                                                onChange={(e) => setPassword(e.target.value)}
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        type="submit"
+                                        disabled={loading}
+                                        className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all duration-200 disabled:opacity-70 flex items-center justify-center gap-2"
+                                    >
+                                        {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <span>ログイン</span>}
+                                    </button>
+                                </form>
+                            </motion.div>
+                        )}
+
+                        {step === 'register' && (
+                            <motion.div
+                                key="register"
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -20 }}
+                                transition={{ duration: 0.3 }}
                             >
-                                管理者ログイン
-                            </a>
-                        </div>
-                    </motion.div>
+                                <div className="mb-10">
+                                    <button onClick={() => setStep('check')} className="text-sm text-slate-400 hover:text-slate-600 mb-4 flex items-center gap-1">← 戻る</button>
+                                    <h2 className="text-3xl font-bold text-slate-900 mb-2">パスワード設定</h2>
+                                    <p className="text-slate-500">初回ログインのため、パスワードを設定してください</p>
+                                </div>
+
+                                {error && (
+                                    <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-100 text-rose-600 text-sm flex items-center gap-3">
+                                        <div className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                                        {error}
+                                    </div>
+                                )}
+
+                                <form onSubmit={handleRegister} className="space-y-6">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-bold text-slate-700">新しいパスワード</label>
+                                        <div className="relative">
+                                            <Key className="absolute left-4 top-4 w-5 h-5 text-slate-400" />
+                                            <input
+                                                type="password"
+                                                className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white text-slate-900 transition-all duration-200"
+                                                placeholder="6文字以上"
+                                                value={password}
+                                                onChange={(e) => setPassword(e.target.value)}
+                                                required
+                                                minLength={6}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-bold text-slate-700">パスワード（確認）</label>
+                                        <div className="relative">
+                                            <Key className="absolute left-4 top-4 w-5 h-5 text-slate-400" />
+                                            <input
+                                                type="password"
+                                                className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white text-slate-900 transition-all duration-200"
+                                                placeholder="もう一度入力"
+                                                value={confirmPassword}
+                                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                                required
+                                                minLength={6}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        type="submit"
+                                        disabled={loading}
+                                        className="w-full py-4 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all duration-200 disabled:opacity-70 flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
+                                    >
+                                        {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <span>設定して開始</span>}
+                                    </button>
+                                </form>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    <div className="mt-12 pt-6 border-t border-slate-100 text-center">
+                        <p className="text-xs text-slate-400 mb-4">管理者の方はこちら</p>
+                        <a
+                            href="/admin/login"
+                            className="inline-flex items-center justify-center px-6 py-2 rounded-lg bg-slate-50 text-slate-600 text-sm font-medium hover:bg-slate-100 transition-colors"
+                        >
+                            管理者ログイン
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>

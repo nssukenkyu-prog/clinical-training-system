@@ -284,6 +284,35 @@ export default function StudentManagement() {
         }
     };
 
+    const handleExportCSV = () => {
+        if (filteredStudents.length === 0) {
+            alert('出力するデータがありません');
+            return;
+        }
+
+        const headers = ['学籍番号', '氏名', 'メールアドレス', '学年', '実習区分', '累積時間(分)', '登録状況'];
+        const rows = filteredStudents.map(s => [
+            s.student_number,
+            s.name,
+            s.email,
+            s.grade,
+            s.training_type,
+            getTotalMinutes(s),
+            s.auth_user_id ? '登録済' : '未登録'
+        ]);
+
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.join(','))
+        ].join('\n');
+
+        const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `学生一覧_${new Date().toISOString().slice(0, 10)}.csv`;
+        link.click();
+    };
+
     const isAllSelected = filteredStudents.length > 0 && selectedStudentIds.size === filteredStudents.length;
 
     return (
@@ -321,6 +350,13 @@ export default function StudentManagement() {
                     >
                         <Upload className="w-4 h-4" />
                         <span>CSV一括登録</span>
+                    </button>
+                    <button
+                        onClick={handleExportCSV}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
+                    >
+                        <Upload className="w-4 h-4 rotate-180" />
+                        <span>CSV出力</span>
                     </button>
                 </div>
             </div >

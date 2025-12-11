@@ -185,6 +185,37 @@ export default function ResultApproval() {
         }
     };
 
+    const handleExportCSV = () => {
+        if (reservations.length === 0) {
+            alert('出力するデータがありません');
+            return;
+        }
+
+        const headers = ['日付', '開始時間', '終了時間', '学籍番号', '氏名', '学年', '実習区分', 'ステータス', '実績時間(分)'];
+        const rows = reservations.map(r => [
+            r.slot.date,
+            r.slot.start_time,
+            r.slot.end_time,
+            r.student.student_number,
+            r.student.name,
+            r.student.grade,
+            r.slot.training_type,
+            r.status === 'completed' ? '承認済' : '未承認',
+            r.actual_minutes || 0
+        ]);
+
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.join(','))
+        ].join('\n');
+
+        const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `実習実績_${filter}_${new Date().toISOString().slice(0, 10)}.csv`;
+        link.click();
+    };
+
 
     // formatDate is moved to module scope
 
@@ -216,6 +247,13 @@ export default function ResultApproval() {
                         承認済
                     </button>
                 </div>
+                <button
+                    onClick={handleExportCSV}
+                    className="ml-4 flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
+                >
+                    <Upload className="w-4 h-4 rotate-180" />
+                    <span className="text-sm font-bold">CSV出力</span>
+                </button>
             </div>
 
             {loading ? (

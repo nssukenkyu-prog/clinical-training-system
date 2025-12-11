@@ -202,6 +202,26 @@ export default function SlotReservation() {
             };
             await addDoc(collection(db, 'reservations'), reservationData);
 
+            // Calendar Sync (GAS Webhook)
+            try {
+                const GAS_CALENDAR_WEBHOOK = import.meta.env.VITE_GAS_CALENDAR_WEBHOOK_URL;
+                if (GAS_CALENDAR_WEBHOOK) {
+                    await fetch(GAS_CALENDAR_WEBHOOK, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        mode: 'no-cors',
+                        body: JSON.stringify({
+                            action: 'create',
+                            title: `【臨床実習】${student.name}`,
+                            description: `実習区分: ${slot.training_type}\n学籍番号: ${student.student_number}`,
+                            startTime: `${slot.date}T${customStartTime}:00`,
+                            endTime: `${slot.date}T${customEndTime}:00`,
+                            location: 'NSSU'
+                        })
+                    });
+                }
+            } catch (e) { console.error('Calendar sync failed', e); }
+
             // Email Notification via GAS
             if (student.email) {
                 try {
