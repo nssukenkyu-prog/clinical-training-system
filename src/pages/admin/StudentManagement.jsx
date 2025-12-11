@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, query, getDocs, addDoc, writeBatch, doc, where, orderBy } from 'firebase/firestore';
-import { Users, Search, Plus, Upload, Mail, Check, X, Filter } from 'lucide-react';
+import { collection, query, getDocs, addDoc, writeBatch, doc, where, orderBy, deleteDoc, updateDoc } from 'firebase/firestore';
+import { Users, Search, Plus, Upload, Mail, Check, X, Filter, Trash2, Edit } from 'lucide-react';
 import { clsx } from 'clsx';
 
 export default function StudentManagement() {
@@ -16,6 +16,7 @@ export default function StudentManagement() {
         grade: 2,
         trainingType: 'I'
     });
+    const [editingStudent, setEditingStudent] = useState(null);
     const [csvData, setCsvData] = useState('');
     const [filter, setFilter] = useState({ grade: 'all', trainingType: 'all' });
     const [sending, setSending] = useState(false);
@@ -184,21 +185,85 @@ export default function StudentManagement() {
 
     const filteredStudents = getFilteredStudents();
 
+    const handleDeleteStudent = async (student) => {
+        if (!window.confirm(`「${student.name}」を削除しますか？\n※この操作は取り消せません。`)) return;
+
+        try {
+            await deleteDoc(doc(db, 'students', student.id));
+            alert('削除しました');
+            loadStudents();
+        } catch (error) {
+            console.error("Error deleting student:", error);
+            alert('削除に失敗しました');
+        }
+    };
+
+    const handleEditClick = (student) => {
+        setEditingStudent({ ...student });
+        // Use the same form data structure for editing
+        setFormData({
+            studentNumber: student.student_number,
+            email: student.email,
+            name: student.name,
+            grade: student.grade,
+            trainingType: student.training_type
+        });
+        setShowModal(true);
+    };
+
+    const handleUpdateStudent = async (e) => {
+        e.preventDefault();
+        if (!editingStudent) return;
+
+        try {
+            await updateDoc(doc(db, 'students', editingStudent.id), {
+                student_number: formData.studentNumber,
+                email: formData.email,
+                name: formData.name,
+                grade: formData.grade,
+                training_type: formData.trainingType
+            });
+
+            alert('更新しました');
+            setShowModal(false);
+            setEditingStudent(null);
+            setFormData({ studentNumber: '', email: '', name: '', grade: 2, trainingType: 'I' });
+            loadStudents();
+        } catch (error) {
+            console.error("Error updating student:", error);
+            alert('更新に失敗しました');
+        }
+    };
+
+    // Modify handleAddStudent to verify if we are editing or adding
+    const handleSaveStudent = async (e) => {
+        if (editingStudent) {
+            handleUpdateStudent(e);
+        } else {
+            handleAddStudent(e);
+        }
+    };
+
     return (
         <div className="space-y-8 pt-10">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900">学生管理</h1>
                     <p className="text-slate-500 mt-1">学生の登録・編集・進捗確認を行います</p>
-                </div>
+                </div >
                 <div className="flex gap-3">
                     <button
-                        onClick={() => setShowModal(true)}
+                        onClick={() => {
+                            setEditingStudent(null);
+                            setFormData({ studentNumber: '', email: '', name: '', grade: 2, trainingType: 'I' });
+                            setShowModal(true);
+                        }}
                         className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
                     >
                         <Plus className="w-4 h-4" />
                         <span>学生を追加</span>
                     </button>
+                    {/* ... CSV Button ... */}
                     <button
                         onClick={() => setShowBulkModal(true)}
                         className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
@@ -207,10 +272,10 @@ export default function StudentManagement() {
                         <span>CSV一括登録</span>
                     </button>
                 </div>
-            </div>
+            </div >
 
             {/* Filters */}
-            <div className="glass-panel p-4 rounded-xl flex flex-wrap items-center gap-4 bg-white shadow-sm border border-slate-200">
+            < div className="glass-panel p-4 rounded-xl flex flex-wrap items-center gap-4 bg-white shadow-sm border border-slate-200" >
                 <div className="flex items-center gap-2 text-slate-500">
                     <Filter className="w-4 h-4" />
                     <span className="text-sm font-medium">フィルター:</span>
@@ -238,10 +303,10 @@ export default function StudentManagement() {
                 <div className="ml-auto text-sm text-slate-500">
                     {filteredStudents.length}名 表示中
                 </div>
-            </div>
+            </div >
 
             {/* Student List */}
-            <div className="glass-panel rounded-2xl overflow-hidden bg-white shadow-lg border-slate-100">
+            < div className="glass-panel rounded-2xl overflow-hidden bg-white shadow-lg border-slate-100" >
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead>
@@ -278,157 +343,167 @@ export default function StudentManagement() {
                                             </span>
                                         )}
                                     </td>
-                                    <td className="px-6 py-4">
-                                        {!student.auth_user_id && (
-                                            <button
-                                                onClick={() => handleResendInvite(student)}
-                                                className="text-xs text-primary hover:text-primary/80 hover:underline font-medium"
-                                            >
-                                                再送信
-                                            </button>
-                                        )}
+                                    <td className="px-6 py-4 flex items-center gap-3">
+                                        <button
+                                            onClick={() => handleEditClick(student)}
+                                            className="text-slate-400 hover:text-indigo-600 transition-colors p-1"
+                                            title="編集"
+                                        >
+                                            <Edit className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteStudent(student)}
+                                            className="text-slate-400 hover:text-rose-600 transition-colors p-1"
+                                            title="削除"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
-            </div>
+            </div >
 
-            {/* Add Student Modal */}
-            {showModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setShowModal(false)}>
-                    <div className="glass-panel p-6 rounded-2xl w-full max-w-md bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-xl font-bold text-slate-900">学生を追加</h3>
-                            <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">
-                                <X className="w-6 h-6" />
-                            </button>
-                        </div>
-
-                        <form onSubmit={handleAddStudent} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">学籍番号</label>
-                                <input
-                                    type="text"
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:border-primary text-slate-900 transition-colors"
-                                    value={formData.studentNumber}
-                                    onChange={e => setFormData({ ...formData, studentNumber: e.target.value })}
-                                    placeholder="24ca000"
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">メールアドレス</label>
-                                <input
-                                    type="email"
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:border-primary text-slate-900 transition-colors"
-                                    value={formData.email}
-                                    onChange={e => setFormData({ ...formData, email: e.target.value })}
-                                    placeholder="student@example.com"
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">氏名</label>
-                                <input
-                                    type="text"
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:border-primary text-slate-900 transition-colors"
-                                    value={formData.name}
-                                    onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                    placeholder="山田 太郎"
-                                    required
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-2">学年</label>
-                                    <select
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:border-primary text-slate-900 transition-colors"
-                                        value={formData.grade}
-                                        onChange={e => setFormData({ ...formData, grade: parseInt(e.target.value) })}
-                                    >
-                                        <option value={2}>2年生</option>
-                                        <option value={3}>3年生</option>
-                                        <option value={4}>4年生</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-2">実習区分</label>
-                                    <select
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:border-primary text-slate-900 transition-colors"
-                                        value={formData.trainingType}
-                                        onChange={e => setFormData({ ...formData, trainingType: e.target.value })}
-                                    >
-                                        <option value="I">実習Ⅰ</option>
-                                        <option value="II">実習Ⅱ</option>
-                                        <option value="IV">実習Ⅳ</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="pt-4">
-                                <button
-                                    type="submit"
-                                    className="w-full px-4 py-3 rounded-xl bg-primary text-white hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 font-bold"
-                                >
-                                    登録
+            {/* Add/Edit Student Modal */}
+            {
+                showModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setShowModal(false)}>
+                        <div className="glass-panel p-6 rounded-2xl w-full max-w-md bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-xl font-bold text-slate-900">{editingStudent ? '学生情報を編集' : '学生を追加'}</h3>
+                                <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">
+                                    <X className="w-6 h-6" />
                                 </button>
                             </div>
-                        </form>
+
+                            <form onSubmit={handleSaveStudent} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">学籍番号</label>
+                                    <input
+                                        type="text"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:border-primary text-slate-900 transition-colors"
+                                        value={formData.studentNumber}
+                                        onChange={e => setFormData({ ...formData, studentNumber: e.target.value })}
+                                        placeholder="24ca000"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">メールアドレス</label>
+                                    <input
+                                        type="email"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:border-primary text-slate-900 transition-colors"
+                                        value={formData.email}
+                                        onChange={e => setFormData({ ...formData, email: e.target.value })}
+                                        placeholder="student@example.com"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">氏名</label>
+                                    <input
+                                        type="text"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:border-primary text-slate-900 transition-colors"
+                                        value={formData.name}
+                                        onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                        placeholder="山田 太郎"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">学年</label>
+                                        <select
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:border-primary text-slate-900 transition-colors"
+                                            value={formData.grade}
+                                            onChange={e => setFormData({ ...formData, grade: parseInt(e.target.value) })}
+                                        >
+                                            <option value={2}>2年生</option>
+                                            <option value={3}>3年生</option>
+                                            <option value={4}>4年生</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-2">実習区分</label>
+                                        <select
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:border-primary text-slate-900 transition-colors"
+                                            value={formData.trainingType}
+                                            onChange={e => setFormData({ ...formData, trainingType: e.target.value })}
+                                        >
+                                            <option value="I">実習Ⅰ</option>
+                                            <option value="II">実習Ⅱ</option>
+                                            <option value="IV">実習Ⅳ</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="pt-4">
+                                    <button
+                                        type="submit"
+                                        className="w-full px-4 py-3 rounded-xl bg-primary text-white hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 font-bold"
+                                    >
+                                        {editingStudent ? '更新' : '登録'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* CSV Bulk Import Modal */}
-            {showBulkModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setShowBulkModal(false)}>
-                    <div className="glass-panel p-6 rounded-2xl w-full max-w-2xl bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-xl font-bold text-slate-900">CSV一括登録</h3>
-                            <button onClick={() => setShowBulkModal(false)} className="text-slate-400 hover:text-slate-600">
-                                <X className="w-6 h-6" />
-                            </button>
-                        </div>
+            {
+                showBulkModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setShowBulkModal(false)}>
+                        <div className="glass-panel p-6 rounded-2xl w-full max-w-2xl bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-xl font-bold text-slate-900">CSV一括登録</h3>
+                                <button onClick={() => setShowBulkModal(false)} className="text-slate-400 hover:text-slate-600">
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
 
-                        <div className="mb-6 p-4 rounded-xl bg-blue-50 border border-blue-100 text-blue-700 text-sm">
-                            <strong className="block mb-1">CSV形式:</strong> 学籍番号,メールアドレス,氏名,学年,実習区分<br />
-                            <span className="text-blue-500">例: 24ca000,yamada@example.com,山田太郎,2,I</span>
-                        </div>
+                            <div className="mb-6 p-4 rounded-xl bg-blue-50 border border-blue-100 text-blue-700 text-sm">
+                                <strong className="block mb-1">CSV形式:</strong> 学籍番号,メールアドレス,氏名,学年,実習区分<br />
+                                <span className="text-blue-500">例: 24ca000,yamada@example.com,山田太郎,2,I</span>
+                            </div>
 
-                        <div className="mb-6">
-                            <label className="block text-sm font-medium text-slate-700 mb-2">CSVデータ</label>
-                            <textarea
-                                className="w-full h-64 bg-slate-50 border border-slate-200 rounded-xl p-4 font-mono text-sm focus:outline-none focus:border-primary text-slate-900 transition-colors resize-none"
-                                value={csvData}
-                                onChange={e => setCsvData(e.target.value)}
-                                placeholder={`24ca000,yamada@example.com,山田太郎,2,I\n24ca001,tanaka@example.com,田中花子,2,I`}
-                            />
-                        </div>
+                            <div className="mb-6">
+                                <label className="block text-sm font-medium text-slate-700 mb-2">CSVデータ</label>
+                                <textarea
+                                    className="w-full h-64 bg-slate-50 border border-slate-200 rounded-xl p-4 font-mono text-sm focus:outline-none focus:border-primary text-slate-900 transition-colors resize-none"
+                                    value={csvData}
+                                    onChange={e => setCsvData(e.target.value)}
+                                    placeholder={`24ca000,yamada@example.com,山田太郎,2,I\n24ca001,tanaka@example.com,田中花子,2,I`}
+                                />
+                            </div>
 
-                        <div className="flex justify-end gap-3">
-                            <button
-                                type="button"
-                                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors font-medium"
-                                onClick={() => setShowBulkModal(false)}
-                            >
-                                キャンセル
-                            </button>
-                            <button
-                                type="button"
-                                className="px-6 py-2 rounded-xl bg-primary text-white hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed font-bold"
-                                onClick={handleBulkImport}
-                                disabled={sending}
-                            >
-                                {sending ? '登録中...' : '一括登録'}
-                            </button>
+                            <div className="flex justify-end gap-3">
+                                <button
+                                    type="button"
+                                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors font-medium"
+                                    onClick={() => setShowBulkModal(false)}
+                                >
+                                    キャンセル
+                                </button>
+                                <button
+                                    type="button"
+                                    className="px-6 py-2 rounded-xl bg-primary text-white hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed font-bold"
+                                    onClick={handleBulkImport}
+                                    disabled={sending}
+                                >
+                                    {sending ? '登録中...' : '一括登録'}
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 }
