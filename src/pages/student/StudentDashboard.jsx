@@ -23,6 +23,8 @@ export default function StudentDashboard() {
             const studentId = sessionStorage.getItem('clinical_student_id');
 
             if (!studentId) {
+                console.error("No studentId in session");
+                // alert("Debugging: No Session ID found"); 
                 navigate('/');
                 return;
             }
@@ -31,6 +33,8 @@ export default function StudentDashboard() {
             const studentDoc = await getDoc(doc(db, 'students', studentId));
 
             if (!studentDoc.exists()) {
+                console.error("Student doc not found for ID:", studentId);
+                alert(`エラー: 学生データが見つかりません (ID: ${studentId})`);
                 sessionStorage.clear();
                 navigate('/');
                 return;
