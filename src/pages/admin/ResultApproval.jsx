@@ -185,37 +185,6 @@ export default function ResultApproval() {
         }
     };
 
-    const handleExportCSV = () => {
-        if (reservations.length === 0) {
-            alert('出力するデータがありません');
-            return;
-        }
-
-        const headers = ['日付', '開始時間', '終了時間', '学籍番号', '氏名', '学年', '実習区分', 'ステータス', '実績時間(分)'];
-        const rows = reservations.map(r => [
-            r.slot.date,
-            r.slot.start_time,
-            r.slot.end_time,
-            r.student.student_number,
-            r.student.name,
-            r.student.grade,
-            r.slot.training_type,
-            r.status === 'completed' ? '承認済' : '未承認',
-            r.actual_minutes || 0
-        ]);
-
-        const csvContent = [
-            headers.join(','),
-            ...rows.map(row => row.join(','))
-        ].join('\n');
-
-        const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `実習実績_${filter}_${new Date().toISOString().slice(0, 10)}.csv`;
-        link.click();
-    };
-
 
     // formatDate is moved to module scope
 
@@ -247,13 +216,6 @@ export default function ResultApproval() {
                         承認済
                     </button>
                 </div>
-                <button
-                    onClick={handleExportCSV}
-                    className="ml-4 flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
-                >
-                    <Upload className="w-4 h-4 rotate-180" />
-                    <span className="text-sm font-bold">CSV出力</span>
-                </button>
             </div>
 
             {loading ? (
@@ -317,41 +279,60 @@ const ResultCard = ({ reservation, defaultDuration, onApprove, onCancel, isProce
                     <div className="flex items-center gap-2">
                         <input
                             type="number"
-                            className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 w-20 text-center focus:outline-none focus:border-primary text-slate-900 font-bold disabled:bg-slate-100 disabled:text-slate-500"
-                            value={minutes}
-                            onChange={(e) => setMinutes(parseInt(e.target.value) || 0)}
+                            className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 w-16 text-center focus:outline-none focus:border-primary text-slate-900 font-bold disabled:bg-slate-100 disabled:text-slate-500"
+                            value={Math.floor(minutes / 60)}
+                            onChange={(e) => {
+                                const newH = parseInt(e.target.value) || 0;
+                                const currentM = minutes % 60;
+                                setMinutes(newH * 60 + currentM);
+                            }}
                             disabled={isProcessing || isCompleted}
+                            min="0"
+                        />
+                        <span className="text-sm font-medium text-slate-600">時間</span>
+                        <input
+                            type="number"
+                            className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 w-16 text-center focus:outline-none focus:border-primary text-slate-900 font-bold disabled:bg-slate-100 disabled:text-slate-500"
+                            value={minutes % 60}
+                            onChange={(e) => {
+                                const newM = parseInt(e.target.value) || 0;
+                                const currentH = Math.floor(minutes / 60);
+                                setMinutes(currentH * 60 + newM);
+                            }}
+                            disabled={isProcessing || isCompleted}
+                            min="0"
+                            max="59"
                         />
                         <span className="text-sm font-medium text-slate-600">分</span>
                     </div>
+
+                    {!isCompleted && (
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => onApprove(reservation, minutes)}
+                                disabled={isProcessing}
+                                className="p-2 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                                title="承認"
+                            >
+                                <Check className="w-5 h-5" />
+                            </button>
+                            <button
+                                onClick={() => onCancel(reservation)}
+                                disabled={isProcessing}
+                                className="p-2 rounded-lg bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-100 transition-colors disabled:opacity-50"
+                                title="欠席/キャンセル"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                    )}
+
+                    {isCompleted && (
+                        <span className="text-emerald-600 text-sm font-bold flex items-center gap-1 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100">
+                            <Check className="w-4 h-4" /> 承認済
+                        </span>
+                    )}
                 </div>
-
-                {!isCompleted && (
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => onApprove(reservation, minutes)}
-                            disabled={isProcessing}
-                            className="p-2 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100 transition-colors disabled:opacity-50"
-                            title="承認"
-                        >
-                            <Check className="w-5 h-5" />
-                        </button>
-                        <button
-                            onClick={() => onCancel(reservation)}
-                            disabled={isProcessing}
-                            className="p-2 rounded-lg bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-100 transition-colors disabled:opacity-50"
-                            title="欠席/キャンセル"
-                        >
-                            <X className="w-5 h-5" />
-                        </button>
-                    </div>
-                )}
-
-                {isCompleted && (
-                    <span className="text-emerald-600 text-sm font-bold flex items-center gap-1 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100">
-                        <Check className="w-4 h-4" /> 承認済
-                    </span>
-                )}
             </div>
         </div>
     );

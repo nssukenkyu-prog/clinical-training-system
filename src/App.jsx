@@ -18,6 +18,7 @@ import SlotManagement from './pages/admin/SlotManagement';
 import StudentManagement from './pages/admin/StudentManagement';
 import SystemSettings from './pages/admin/SystemSettings';
 import ResultApproval from './pages/admin/ResultApproval';
+import SiteKiosk from './pages/site/SiteKiosk';
 
 import './index.css';
 
@@ -146,6 +147,9 @@ function App() {
             )
           }
         />
+
+        {/* Kiosk Route (Public/Protected by PIN) */}
+        <Route path="/site-kiosk" element={<SiteKiosk />} />
 
         {/* Admin Protected Routes */}
         <Route
