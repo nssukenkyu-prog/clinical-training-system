@@ -2,12 +2,16 @@ import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, query, getDocs, addDoc, writeBatch, doc, where, orderBy, deleteDoc, updateDoc } from 'firebase/firestore';
 import { Users, Search, Plus, Upload, Mail, Check, X, Filter, Trash2, Edit } from 'lucide-react';
+import { hashPassword } from '../../utils/crypto';
 import { clsx } from 'clsx';
 
 export default function StudentManagement() {
     const [students, setStudents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
+    const [showDetailModal, setShowDetailModal] = useState(false);
+    const [selectedDetailStudent, setSelectedDetailStudent] = useState(null);
+    const [newPassword, setNewPassword] = useState('');
     const [showBulkModal, setShowBulkModal] = useState(false);
     const [formData, setFormData] = useState({
         studentNumber: '',
@@ -55,6 +59,61 @@ export default function StudentManagement() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleStudentClick = (student) => {
+        setSelectedDetailStudent(student);
+        setNewPassword('');
+        setShowDetailModal(true);
+    };
+
+    const handlePasswordReset = async (e) => {
+        e.preventDefault();
+        if (!selectedDetailStudent || !newPassword) return;
+
+        if (!window.confirm(`「${selectedDetailStudent.name}」さんのパスワードを変更してもよろしいですか？`)) return;
+
+        try {
+            const passwordHash = await hashPassword(newPassword);
+            await updateDoc(doc(db, 'students', selectedDetailStudent.id), {
+                password_hash: passwordHash,
+                password_set: true,
+                updated_at: new Date().toISOString()
+            });
+
+            alert('パスワードを変更しました');
+            setNewPassword('');
+            // Update local state
+            const updatedStudents = students.map(s =>
+                s.id === selectedDetailStudent.id ? { ...s, password_set: true } : s
+            );
+            setStudents(updatedStudents);
+        } catch (error) {
+            console.error("Error resetting password:", error);
+            alert('パスワード変更に失敗しました');
+        }
+    };
+
+    const getStudentStats = (student) => {
+        if (!student || !student.reservations) return { totalReserved: 0, totalCompleted: 0 };
+
+        const reservations = student.reservations;
+
+        // Cumulative (Completed)
+        const completed = reservations.filter(r => r.status === 'completed');
+        const totalCompleted = completed.reduce((sum, r) => sum + (r.actual_minutes || 0), 0);
+
+        // Scheduled (Confirmed)
+        const scheduled = reservations.filter(r => r.status === 'confirmed');
+        const start = (str) => {
+            const [h, m] = str.split(':').map(Number);
+            return h * 60 + m;
+        };
+        const totalScheduled = scheduled.reduce((sum, r) => {
+            return sum + (start(r.endTime) - start(r.startTime));
+        }, 0);
+
+        return { totalReserved: totalScheduled, totalCompleted };
     };
 
     const getFilteredStudents = () => {
@@ -391,7 +450,7 @@ export default function StudentManagement() {
                                         />
                                     </td>
                                     <td className="px-6 py-4 text-sm font-mono text-slate-600">{student.student_number}</td>
-                                    <td className="px-6 py-4 text-sm font-medium text-slate-900">{student.name}</td>
+                                    <td className="px-6 py-4 text-sm font-medium text-slate-900 cursor-pointer hover:text-primary hover:underline" onClick={() => handleStudentClick(student)}>{student.name}</td>
                                     <td className="px-6 py-4 text-sm text-slate-500">{student.grade}年</td>
                                     <td className="px-6 py-4 text-sm">
                                         <span className="px-2 py-1 rounded text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">
@@ -571,6 +630,110 @@ export default function StudentManagement() {
                     </div>
                 )
             }
+
+            {/* Student Detail Modal */}
+            {showDetailModal && selectedDetailStudent && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setShowDetailModal(false)}>
+                    <div className="glass-panel p-6 rounded-2xl w-full max-w-4xl bg-white shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-xl font-bold text-slate-900">学生詳細情報</h3>
+                            <button onClick={() => setShowDetailModal(false)} className="text-slate-400 hover:text-slate-600">
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <div className="grid md:grid-cols-2 gap-8">
+                            {/* Left Column: Info & Stats */}
+                            <div className="space-y-6">
+                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                    <h4 className="text-sm font-bold text-slate-500 mb-3 uppercase tracking-wider">基本情報</h4>
+                                    <div className="space-y-2">
+                                        <p><span className="text-slate-500 w-24 inline-block">氏名:</span> <span className="font-bold text-lg">{selectedDetailStudent.name}</span></p>
+                                        <p><span className="text-slate-500 w-24 inline-block">学籍番号:</span> <span className="font-mono">{selectedDetailStudent.student_number}</span></p>
+                                        <p><span className="text-slate-500 w-24 inline-block">メール:</span> {selectedDetailStudent.email}</p>
+                                        <p><span className="text-slate-500 w-24 inline-block">学年/区分:</span> {selectedDetailStudent.grade}年 / 実習{selectedDetailStudent.training_type}</p>
+                                    </div>
+                                </div>
+
+                                <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                                    <h4 className="text-sm font-bold text-indigo-500 mb-3 uppercase tracking-wider">実習時間集計</h4>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <p className="text-xs text-indigo-400 mb-1">現在の予約合計</p>
+                                            <p className="text-2xl font-bold text-indigo-700">{formatTime(getStudentStats(selectedDetailStudent).totalReserved)}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-indigo-400 mb-1">累積実習時間</p>
+                                            <p className="text-2xl font-bold text-emerald-600">{formatTime(getStudentStats(selectedDetailStudent).totalCompleted)}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="border-t border-slate-200 pt-6">
+                                    <h4 className="text-sm font-bold text-slate-900 mb-4">パスワード変更</h4>
+                                    <form onSubmit={handlePasswordReset} className="flex gap-2">
+                                        <input
+                                            type="password"
+                                            placeholder="新しいパスワード"
+                                            className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary"
+                                            value={newPassword}
+                                            onChange={e => setNewPassword(e.target.value)}
+                                            minLength={6}
+                                            required
+                                        />
+                                        <button
+                                            type="submit"
+                                            className="px-4 py-2 bg-slate-800 text-white text-sm font-bold rounded-lg hover:bg-slate-700 transition-colors"
+                                        >
+                                            変更
+                                        </button>
+                                    </form>
+                                    <p className="text-xs text-slate-400 mt-2">※管理者権限でパスワードを強制的に上書きします。</p>
+                                </div>
+                            </div>
+
+                            {/* Right Column: Reservation List */}
+                            <div>
+                                <h4 className="text-sm font-bold text-slate-500 mb-3 uppercase tracking-wider">予約履歴</h4>
+                                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden max-h-[500px] overflow-y-auto">
+                                    {(!selectedDetailStudent.reservations || selectedDetailStudent.reservations.length === 0) ? (
+                                        <div className="p-8 text-center text-slate-400">履歴はありません</div>
+                                    ) : (
+                                        <table className="w-full text-sm">
+                                            <thead className="bg-slate-50 sticky top-0">
+                                                <tr>
+                                                    <th className="px-4 py-2 text-left font-medium text-slate-500">日付</th>
+                                                    <th className="px-4 py-2 text-left font-medium text-slate-500">時間</th>
+                                                    <th className="px-4 py-2 text-left font-medium text-slate-500">状態</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {selectedDetailStudent.reservations
+                                                    .sort((a, b) => new Date(b.date) - new Date(a.date)) // Sort descending
+                                                    .map((res, i) => (
+                                                        <tr key={i} className="hover:bg-slate-50">
+                                                            <td className="px-4 py-3">{res.date}</td>
+                                                            <td className="px-4 py-3 whitespace-nowrap">{res.startTime} - {res.endTime}</td>
+                                                            <td className="px-4 py-3">
+                                                                <span className={`px-2 py-1 rounded-full text-xs font-bold ${res.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
+                                                                        res.status === 'confirmed' ? 'bg-blue-100 text-blue-700' :
+                                                                            'bg-slate-100 text-slate-600'
+                                                                    }`}>
+                                                                    {res.status === 'completed' ? '完了' :
+                                                                        res.status === 'confirmed' ? '予約中' : res.status}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                            </tbody>
+                                        </table>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div >
     );
 }
