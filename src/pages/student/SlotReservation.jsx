@@ -33,41 +33,39 @@ export default function SlotReservation() {
     }, []);
 
     useEffect(() => {
-        loadSlots();
-    }, [currentMonth]);
+        let unsubscribe;
 
-    // Scroll selected date into view
-    useEffect(() => {
-        if (dateScrollRef.current) {
-            const selectedEl = dateScrollRef.current.querySelector('[data-selected="true"]');
-            if (selectedEl) {
-                selectedEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-            }
-        }
-    }, [selectedDate]);
+        const loadSlots = async () => {
+            setLoading(true);
+            try {
+                const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+                const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+                const startStr = startOfMonth.toISOString().split('T')[0];
+                const endStr = endOfMonth.toISOString().split('T')[0];
 
-    const loadSlots = async () => {
-        setLoading(true);
-        try {
-            const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-            const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
-            const startStr = startOfMonth.toISOString().split('T')[0];
-            const endStr = endOfMonth.toISOString().split('T')[0];
+                const q = query(collection(db, 'slots'), where('date', '>=', startStr), where('date', '<=', endStr));
 
-            const q = query(collection(db, 'training_slots'), where('date', '>=', startStr), where('date', '<=', endStr));
-
-            // Real-time listener for slots
-            const unsubscribe = onSnapshot(q, (snapshot) => {
-                const slotsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                setSlots(slotsData);
+                // Real-time listener for slots
+                unsubscribe = onSnapshot(q, (snapshot) => {
+                    const slotsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setSlots(slotsData);
+                    setLoading(false);
+                }, (error) => {
+                    console.error("Snapshot error:", error);
+                    setLoading(false);
+                });
+            } catch (error) {
+                console.error(error);
                 setLoading(false);
-            });
-            return () => unsubscribe();
-        } catch (error) {
-            console.error(error);
-            setLoading(false);
-        }
-    };
+            }
+        };
+
+        loadSlots();
+
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
+    }, [currentMonth]);
 
     const getDaysInMonth = () => {
         const year = currentMonth.getFullYear();
