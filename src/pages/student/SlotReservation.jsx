@@ -91,12 +91,77 @@ export default function SlotReservation() {
         return slot.reservations.some(r => r.student_id === student.id && r.status !== 'cancelled');
     };
 
+    const parseMinutes = (timeStr) => {
+        const [h, m] = timeStr.split(':').map(Number);
+        return h * 60 + m;
+    };
+
+    const checkSimultaneousCapacity = (slot, newStartStr, newEndStr) => {
+        const newStart = parseMinutes(newStartStr);
+        const newEnd = parseMinutes(newEndStr);
+        const limit = slot.capacity || 5; // Default to 5 if not set
+
+        // Filter valid reservations for this slot (excluding cancelled)
+        const activeReservations = (slot.reservations || []).filter(r => r.status !== 'cancelled');
+
+        // We need to check if at any point in [newStart, newEnd), the count >= limit.
+        // We'll calculate the usage at every "event point" (start or end of any reservation) that falls within our range.
+
+        // 1. Get all relevant reservations (those that overlap with new interval)
+        const overlaps = activeReservations.filter(r => {
+            const rStart = parseMinutes(r.custom_start_time || r.slot_start_time);
+            const rEnd = parseMinutes(r.custom_end_time || r.slot_end_time);
+            return rStart < newEnd && rEnd > newStart;
+        });
+
+        // If no overlaps, we are fine
+        if (overlaps.length === 0) return true;
+
+        // 2. Create timeline points
+        // We only care about points within our new interval [newStart, newEnd]
+        const points = new Set([newStart]);
+        overlaps.forEach(r => {
+            const rStart = parseMinutes(r.custom_start_time || r.slot_start_time);
+            const rEnd = parseMinutes(r.custom_end_time || r.slot_end_time);
+            if (rStart > newStart && rStart < newEnd) points.add(rStart);
+            if (rEnd > newStart && rEnd < newEnd) points.add(rEnd);
+        });
+
+        const sortedPoints = Array.from(points).sort((a, b) => a - b);
+
+        // 3. Check each segment
+        for (let i = 0; i < sortedPoints.length; i++) {
+            const time = sortedPoints[i];
+            // Check concurrency at this specific time (inclusive of start, exclusive of end)
+            // A reservation is active if start <= time < end
+            const concurrency = overlaps.filter(r => {
+                const rStart = parseMinutes(r.custom_start_time || r.slot_start_time);
+                const rEnd = parseMinutes(r.custom_end_time || r.slot_end_time);
+                return rStart <= time && rEnd > time;
+            }).length;
+
+            if (concurrency >= limit) {
+                return false; // Limit reached at this time
+            }
+        }
+
+        return true;
+    };
+
     const getAvailability = (slot) => {
+        // Visual indicator only - simplistic check.
+        // We do NOT block based on this anymore, as requested.
         const reservedCount = (slot.reservations || []).filter(r => r.status !== 'cancelled').length;
         const remaining = slot.capacity - reservedCount;
-        if (remaining <= 0) return { label: '満員', color: 'bg-rose-100 text-rose-600 border-rose-200', remaining: 0 };
-        if (remaining <= 2) return { label: '残りわずか', color: 'bg-amber-100 text-amber-600 border-amber-200', remaining };
-        return { label: '空きあり', color: 'bg-emerald-100 text-emerald-600 border-emerald-200', remaining };
+
+        // Even if mathematically negative (more people total), we show "Available" or "Few Left" 
+        // because they might be non-overlapping.
+        // Changing logic: Unless remaining is VERY negative, we show available.
+        // Actually, let's just show "空きあり" (Available) effectively always, 
+        // or a different label like "受付中" (Accepting).
+        // To be safe and avoid confusing "Full" message:
+
+        return { label: '受付中', color: 'bg-emerald-100 text-emerald-600 border-emerald-200', remaining: 99 };
     };
 
     const handleReserve = (slot) => {
@@ -111,7 +176,13 @@ export default function SlotReservation() {
         setReserving(true);
 
         try {
-            // Validation (omitted for brevity, same as before)
+            // Strict Simultaneous Capacity Check
+            if (!checkSimultaneousCapacity(selectedSlot, customStartTime, customEndTime)) {
+                alert('指定された時間は定員(5名)に達しているため予約できません。\n時間をずらして再度お試しください。');
+                setReserving(false);
+                return;
+            }
+
             const reservationData = {
                 student_id: student.id,
                 slot_id: selectedSlot.id,
