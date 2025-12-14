@@ -788,6 +788,11 @@ export default function StudentManagement() {
                                                         )}>
                                                             {r.status === 'completed' ? '承認済' : '予約中'}
                                                         </span>
+                                                        {(r.check_in_time || r.check_out_time) && (
+                                                            <div className="text-[10px] text-slate-400 font-mono">
+                                                                {r.check_in_time?.slice(0, 5) || '--:--'} - {r.check_out_time?.slice(0, 5) || '--:--'}
+                                                            </div>
+                                                        )}
                                                         {r.actual_minutes && (
                                                             <span className="text-xs font-mono font-bold text-slate-600">
                                                                 {Math.floor(r.actual_minutes / 60)}h{r.actual_minutes % 60}m

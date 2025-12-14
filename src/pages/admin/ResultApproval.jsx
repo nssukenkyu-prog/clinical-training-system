@@ -269,6 +269,11 @@ const ResultCard = ({ reservation, defaultDuration, onApprove, onCancel, isProce
                     <span className="text-slate-500 text-sm font-medium">
                         {formatDate(reservation.slot.date)} {reservation.slot.start_time.slice(0, 5)}-{reservation.slot.end_time.slice(0, 5)}
                     </span>
+                    {(reservation.check_in_time || reservation.check_out_time) && (
+                        <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-mono">
+                            実績: {reservation.check_in_time?.slice(0, 5) || '--:--'} - {reservation.check_out_time?.slice(0, 5) || '--:--'}
+                        </span>
+                    )}
                 </div>
                 <div className="flex items-center gap-3">
                     <h3 className="text-lg font-bold text-slate-900">{reservation.student.name}</h3>

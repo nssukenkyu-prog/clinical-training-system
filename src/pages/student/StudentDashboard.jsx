@@ -228,6 +228,11 @@ export default function StudentDashboard() {
                                                 <div className="text-xs text-slate-500 font-medium">
                                                     {res.slot_training_type} • {res.custom_start_time.slice(0, 5)}-{res.custom_end_time.slice(0, 5)}
                                                 </div>
+                                                {res.status === 'completed' && (res.check_in_time || res.check_out_time) && (
+                                                    <div className="text-[10px] text-emerald-600 font-mono mt-0.5">
+                                                        実績: {res.check_in_time?.slice(0, 5) || '--:--'} - {res.check_out_time?.slice(0, 5) || '--:--'}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                         <span className={`inline-block px-2.5 py-1 rounded-lg text-xs font-bold ${status.color}`}>
