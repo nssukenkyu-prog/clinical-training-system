@@ -207,8 +207,40 @@ export default function SlotReservation() {
             // Add Doc & Sync Logic (Same as before)
             await addDoc(collection(db, 'reservations'), reservationData);
 
-            // GAS Sync & Email (Same as before)
-            // ... (Keep existing logic) ...
+            // GAS Sync & Email
+            try {
+                const GAS_WEBHOOK_URL = import.meta.env.VITE_GAS_EMAIL_WEBHOOK_URL;
+                if (GAS_WEBHOOK_URL && student.email) {
+                    await fetch(GAS_WEBHOOK_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        mode: 'no-cors',
+                        body: JSON.stringify({
+                            to: student.email,
+                            subject: '【臨床実習】実習予約のお知らせ',
+                            body: `
+<!DOCTYPE html>
+<html>
+<body style="font-family: sans-serif; padding: 20px;">
+  <h2 style="color: #4f46e5;">実習予約完了のお知らせ</h2>
+  <p>${student.name} 様</p>
+  <p>以下の内容で実習予約を受け付けました。</p>
+  <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin: 20px 0;">
+    <ul style="list-style: none; padding: 0;">
+      <li style="margin-bottom: 8px;">📅 <b>日時:</b> ${formatDate(selectedSlot.date).full} ${customStartTime} - ${customEndTime}</li>
+      <li style="margin-bottom: 8px;">📋 <b>実習:</b> 臨床実習 ${selectedSlot.training_type}</li>
+    </ul>
+  </div>
+  <p style="color: #64748b; font-size: 0.9em;">※キャンセルはマイページから行えます。</p>
+</body>
+</html>`
+                        })
+                    });
+                }
+            } catch (e) {
+                console.error('Email failed', e);
+                // Do not block UI success even if email fails
+            }
 
             alert('予約が完了しました');
             setShowTimeModal(false);

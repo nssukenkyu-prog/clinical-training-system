@@ -177,6 +177,42 @@ export default function ResultApproval() {
             });
 
             setReservations(reservations.filter(r => r.id !== reservation.id));
+
+            // Email Notification
+            if (reservation.student.email) {
+                try {
+                    const GAS_WEBHOOK_URL = import.meta.env.VITE_GAS_EMAIL_WEBHOOK_URL;
+                    if (GAS_WEBHOOK_URL) {
+                        await fetch(GAS_WEBHOOK_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            mode: 'no-cors',
+                            body: JSON.stringify({
+                                to: reservation.student.email,
+                                subject: '【臨床実習】実習キャンセルのご連絡',
+                                body: `
+<!DOCTYPE html>
+<html>
+<body style="font-family: sans-serif; padding: 20px;">
+  <h2 style="color: #be123c;">実習キャンセルのお知らせ</h2>
+  <p>${reservation.student.name} 様</p>
+  <p>以下の実習予約が管理者によりキャンセルされました。</p>
+  <div style="background: #fff1f2; padding: 15px; border-radius: 8px; border: 1px solid #fecdd3; margin: 20px 0;">
+    <ul style="list-style: none; padding: 0;">
+      <li style="margin-bottom: 8px;">📅 <b>日時:</b> ${formatDate(reservation.slot.date)} ${reservation.slot.start_time.slice(0, 5)} - ${reservation.slot.end_time.slice(0, 5)}</li>
+      <li>📋 <b>実習:</b> 臨床実習 ${reservation.slot.training_type}</li>
+    </ul>
+  </div>
+  <p style="color: #64748b; font-size: 0.9em;">ご不明な点がございましたら教員までお問い合わせください。</p>
+</body>
+</html>`
+                            })
+                        });
+                    }
+                } catch (e) {
+                    console.error('Email failed', e);
+                }
+            }
         } catch (error) {
             console.error('Error cancelling:', error);
             alert('キャンセル処理に失敗しました');

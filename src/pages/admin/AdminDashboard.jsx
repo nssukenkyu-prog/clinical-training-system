@@ -119,13 +119,24 @@ export default function AdminDashboard() {
                 }
             }
 
+            // Fetch all completed reservations to determine 'is_first_day'
+            const allCompletedReservationsSnapshot = await getDocs(
+                query(reservationsRef, where('status', '==', 'completed'))
+            );
+            const completedCountMap = {};
+            allCompletedReservationsSnapshot.docs.forEach(doc => {
+                const data = doc.data();
+                completedCountMap[data.student_id] = (completedCountMap[data.student_id] || 0) + 1;
+            });
+
             // Merge
             const slotsWithReservations = slotsData.map(slot => {
                 const slotReservations = reservationsData
                     .filter(r => r.slot_id === slot.id)
                     .map(r => ({
                         ...r,
-                        students: studentsMap[r.student_id] || { name: 'Unknown' }
+                        students: studentsMap[r.student_id] || { name: 'Unknown', student_number: '' },
+                        is_first_day: (completedCountMap[r.student_id] || 0) === 0 // If 0 completed previously, this is first day
                     }));
 
                 return {
@@ -436,7 +447,12 @@ export default function AdminDashboard() {
                                                     {r.students?.name?.[0]}
                                                 </div>
                                                 <div>
-                                                    <div className="font-bold text-slate-900 text-sm">{r.students?.name}</div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-bold text-slate-900 text-sm">{r.students?.name}</span>
+                                                        {r.is_first_day && (
+                                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200 font-bold">初日</span>
+                                                        )}
+                                                    </div>
                                                     <div className="text-xs text-slate-500 font-mono">{r.students?.student_number}</div>
                                                 </div>
                                             </div>
