@@ -164,8 +164,17 @@ export default function SlotReservation() {
 
     const handleReserve = (slot) => {
         setSelectedSlot(slot);
-        setCustomStartTime(slot.start_time);
-        setCustomEndTime(slot.end_time);
+
+        // Default to first valid start time
+        const validStarts = getValidStartTimes(slot);
+        const initialStart = validStarts.length > 0 ? validStarts[0] : slot.start_time;
+        setCustomStartTime(initialStart);
+
+        // Default to first valid end time for that start
+        const validEnds = getValidEndTimes(initialStart, slot.end_time);
+        const initialEnd = validEnds.length > 0 ? validEnds[0] : slot.end_time;
+        setCustomEndTime(initialEnd);
+
         setShowTimeModal(true);
     };
 
@@ -392,21 +401,39 @@ export default function SlotReservation() {
                             <div className="space-y-4 mb-8">
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">開始時間</label>
-                                    <input
-                                        type="time"
+                                    <select
                                         value={customStartTime}
-                                        onChange={(e) => setCustomStartTime(e.target.value)}
-                                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-lg font-bold text-slate-900 focus:border-indigo-500 focus:outline-none transition-colors"
-                                    />
+                                        onChange={(e) => {
+                                            const newStart = e.target.value;
+                                            setCustomStartTime(newStart);
+                                            // Auto-adjust end time if needed (reset to min duration)
+                                            // Ideally we find the closest valid end time or min duration
+                                            const validEnds = getValidEndTimes(newStart, selectedSlot.end_time);
+                                            if (validEnds.length > 0) {
+                                                setCustomEndTime(validEnds[0]);
+                                            } else {
+                                                setCustomEndTime('');
+                                            }
+                                        }}
+                                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-lg font-bold text-slate-900 focus:border-indigo-500 focus:outline-none transition-colors appearance-none"
+                                    >
+                                        {getValidStartTimes(selectedSlot).map(t => (
+                                            <option key={t} value={t}>{t}</option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">終了時間</label>
-                                    <input
-                                        type="time"
+                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">終了時間 (2時間以上)</label>
+                                    <select
                                         value={customEndTime}
                                         onChange={(e) => setCustomEndTime(e.target.value)}
-                                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-lg font-bold text-slate-900 focus:border-indigo-500 focus:outline-none transition-colors"
-                                    />
+                                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-lg font-bold text-slate-900 focus:border-indigo-500 focus:outline-none transition-colors appearance-none"
+                                        disabled={!customStartTime}
+                                    >
+                                        {getValidEndTimes(customStartTime, selectedSlot.end_time).map(t => (
+                                            <option key={t} value={t}>{t}</option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
 
@@ -419,8 +446,8 @@ export default function SlotReservation() {
                                 </button>
                                 <button
                                     onClick={confirmReservation}
-                                    disabled={reserving}
-                                    className="flex-1 py-3.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/30 disabled:opacity-70"
+                                    disabled={reserving || !customStartTime || !customEndTime}
+                                    className="flex-1 py-3.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/30 disabled:opacity-70 disabled:cursor-not-allowed"
                                 >
                                     {reserving ? '処理中...' : '確定する'}
                                 </button>
@@ -432,3 +459,52 @@ export default function SlotReservation() {
         </div>
     );
 }
+
+// Helper Functions for Time Logic
+const ALLOWED_START_TIMES = ['08:30', '11:00', '13:20', '15:00', '16:40', '18:20'];
+
+const parseMinutes = (timeStr) => {
+    if (!timeStr) return 0;
+    const [h, m] = timeStr.split(':').map(Number);
+    return h * 60 + m;
+};
+
+const formatMinutes = (minutes) => {
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+};
+
+const getValidStartTimes = (slot) => {
+    if (!slot) return [];
+    const slotStart = parseMinutes(slot.start_time);
+    const slotEnd = parseMinutes(slot.end_time);
+
+    // Filter allowed times that fall within the slot (start needs to be strictly before end - min duration)
+    // Actually, start needs to be early enough that start + 120 <= slotEnd
+    return ALLOWED_START_TIMES.filter(t => {
+        const tMin = parseMinutes(t);
+        return tMin >= slotStart && (tMin + 120) <= slotEnd;
+    });
+};
+
+const getValidEndTimes = (startTime, slotEndTime) => {
+    if (!startTime || !slotEndTime) return [];
+
+    const startMin = parseMinutes(startTime);
+    const slotEndMin = parseMinutes(slotEndTime);
+    const validTimes = [];
+
+    // Start at +120 minutes (2 hours)
+    let current = startMin + 120;
+
+    // Round up to nearest 10 if not already (though +120 to 08:30 is 10:30 which is valid)
+    // 08:30 -> 8*60+30 = 510. +120 = 630 (10:30). 630%10 == 0. OK.
+
+    while (current <= slotEndMin) {
+        validTimes.push(formatMinutes(current));
+        current += 10;
+    }
+
+    return validTimes;
+};
