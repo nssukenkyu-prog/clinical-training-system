@@ -93,16 +93,16 @@ export default function StudentDashboard() {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.1 }}
-                className="relative overflow-hidden rounded-3xl bg-slate-900 text-white p-8 shadow-2xl shadow-indigo-500/20"
+                className="relative overflow-hidden rounded-3xl bg-secondary text-white p-8 shadow-2xl shadow-primary/20"
             >
-                <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-                <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-500/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2"></div>
+                <div className="absolute top-0 right-0 w-64 h-64 bg-primary/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+                <div className="absolute bottom-0 left-0 w-64 h-64 bg-accent/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2"></div>
 
                 <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
                     <div className="text-center md:text-left">
                         <div className="flex items-center gap-2 justify-center md:justify-start text-indigo-300 mb-2 font-medium">
-                            <Trophy className="w-5 h-5" />
-                            <span>必須時間達成率</span>
+                            <Trophy className="w-5 h-5 text-accent" />
+                            <span className="text-accent/80">必須時間達成率</span>
                         </div>
                         <div className="text-5xl font-bold mb-1 tracking-tight">
                             {totalHours}<span className="text-2xl text-slate-400 font-medium">h</span> {remainingMinutes}<span className="text-2xl text-slate-400 font-medium">m</span>
@@ -127,8 +127,8 @@ export default function StudentDashboard() {
                             />
                             <defs>
                                 <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                    <stop offset="0%" stopColor="#6366f1" />
-                                    <stop offset="100%" stopColor="#10b981" />
+                                    <stop offset="0%" stopColor="#3b82f6" />
+                                    <stop offset="100%" stopColor="#06b6d4" />
                                 </linearGradient>
                             </defs>
                         </svg>
@@ -146,15 +146,15 @@ export default function StudentDashboard() {
                 transition={{ delay: 0.2 }}
             >
                 <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-indigo-500" />
+                    <Calendar className="w-5 h-5 text-primary" />
                     次回の予約
                 </h2>
                 {nextReservation ? (
                     <div className="group relative bg-white rounded-2xl p-6 shadow-lg shadow-slate-200/50 border border-slate-100 overflow-hidden hover:shadow-xl transition-shadow">
-                        <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-indigo-500 to-violet-500"></div>
+                        <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-primary to-accent"></div>
                         <div className="flex justify-between items-start">
                             <div>
-                                <span className="inline-block px-3 py-1 rounded-full bg-indigo-50 text-indigo-600 text-xs font-bold mb-3">
+                                <span className="inline-block px-3 py-1 rounded-full bg-blue-50 text-primary text-xs font-bold mb-3">
                                     臨床実習 {nextReservation.slot_training_type}
                                 </span>
                                 <div className="text-2xl font-bold text-slate-900 mb-1">
@@ -166,14 +166,14 @@ export default function StudentDashboard() {
                                 </div>
                             </div>
                             <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center">
-                                <Activity className="w-6 h-6 text-slate-400 group-hover:text-indigo-500 transition-colors" />
+                                <Activity className="w-6 h-6 text-slate-400 group-hover:text-primary transition-colors" />
                             </div>
                         </div>
                     </div>
                 ) : (
                     <div className="bg-slate-50 rounded-2xl p-8 text-center border border-slate-100 border-dashed">
                         <p className="text-slate-400 font-medium">次回の予約はありません</p>
-                        <a href="/student/reservation" className="inline-block mt-4 px-6 py-2 bg-white text-indigo-600 font-bold rounded-full shadow-sm hover:shadow-md transition-all text-sm">
+                        <a href="/student/reservation" className="inline-block mt-4 px-6 py-2 bg-white text-primary font-bold rounded-full shadow-sm hover:shadow-md transition-all text-sm">
                             予約を入れる
                         </a>
                     </div>
@@ -204,8 +204,8 @@ export default function StudentDashboard() {
                             >
                                 <div className="flex items-center gap-4">
                                     <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${res.status === 'completed' ? 'bg-emerald-100 text-emerald-600' :
-                                            res.status === 'confirmed' ? 'bg-indigo-100 text-indigo-600' :
-                                                'bg-slate-100 text-slate-400'
+                                        res.status === 'confirmed' ? 'bg-indigo-100 text-indigo-600' :
+                                            'bg-slate-100 text-slate-400'
                                         }`}>
                                         {res.status === 'completed' ? <CheckCircle2 className="w-5 h-5" /> :
                                             res.status === 'confirmed' ? <Calendar className="w-5 h-5" /> :

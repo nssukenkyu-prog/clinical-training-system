@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, query, where, getDocs, updateDoc, doc, orderBy, documentId } from 'firebase/firestore';
-import { CheckSquare, Search, Check, X, Clock } from 'lucide-react';
+import { SquareCheck, Search, Check, X, Clock } from 'lucide-react';
 import { clsx } from 'clsx';
 
 // Helper function (module scope for use in ResultCard)
@@ -224,13 +224,16 @@ export default function ResultApproval() {
                 </div>
             ) : reservations.length === 0 ? (
                 <div className="glass-panel p-12 rounded-2xl text-center text-slate-500 bg-white shadow-lg border-slate-100">
-                    <CheckSquare className="w-12 h-12 mx-auto mb-4 opacity-20 text-slate-700" />
+                    <SquareCheck className="w-12 h-12 mx-auto mb-4 opacity-20 text-slate-700" />
                     <p>対象のデータはありません</p>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 gap-4">
                     {reservations.map((reservation) => {
-                        const defaultDuration = calculateDuration(reservation.slot.start_time, reservation.slot.end_time);
+                        const defaultDuration = calculateDuration(
+                            reservation.check_in_time || reservation.slot.start_time,
+                            reservation.check_out_time || reservation.slot.end_time
+                        );
 
                         return (
                             <ResultCard

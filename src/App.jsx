@@ -7,11 +7,8 @@ import Layout from './components/Layout';
 
 // Pages
 import StudentEntry from './pages/student/StudentEntry';
-// import SetPassword from './pages/student/SetPassword'; // Removed
-
 import StudentDashboard from './pages/student/StudentDashboard';
 import SlotReservation from './pages/student/SlotReservation';
-
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import SlotManagement from './pages/admin/SlotManagement';
@@ -25,158 +22,124 @@ import './index.css';
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [checkingRole, setCheckingRole] = useState(true);
   const [userRole, setUserRole] = useState(null); // 'student' | 'admin'
   const [userName, setUserName] = useState('');
 
-  const checkUserRole = async (currentUser) => {
+  // Role detection logic
+  const detectRole = async (currentUser) => {
     if (!currentUser) {
       setUserRole(null);
       setUserName('');
-      setCheckingRole(false);
       return;
     }
 
     try {
-      setCheckingRole(true);
-      // Check Admin by email
+      // 1. Check Admin
       const adminsRef = collection(db, 'admins');
-      const qAdminEmail = query(adminsRef, where('email', '==', currentUser.email));
-      const adminSnapshot = await getDocs(qAdminEmail);
-
-      if (!adminSnapshot.empty) {
-        const adminData = adminSnapshot.docs[0].data();
+      const qAdmin = query(adminsRef, where('email', '==', currentUser.email));
+      const adminSnap = await getDocs(qAdmin);
+      if (!adminSnap.empty) {
         setUserRole('admin');
-        setUserName(adminData.name || 'Admin');
-      } else {
-        // Check Student by email
-        const studentsRef = collection(db, 'students');
-        const qStudentEmail = query(studentsRef, where('email', '==', currentUser.email));
-        const studentSnapshot = await getDocs(qStudentEmail);
-
-        if (!studentSnapshot.empty) {
-          const studentData = studentSnapshot.docs[0].data();
-          setUserRole('student');
-          setUserName(studentData.name || 'Student');
-        } else {
-          setUserRole(null); // Unknown user
-        }
+        setUserName(adminSnap.docs[0].data().name || 'Admin');
+        return;
       }
-    } catch (error) {
-      console.error("Failed to check user role:", error);
-    } finally {
-      setCheckingRole(false);
+
+      // 2. Check Student
+      const studentsRef = collection(db, 'students');
+      const qStudent = query(studentsRef, where('email', '==', currentUser.email));
+      const studentSnap = await getDocs(qStudent);
+      if (!studentSnap.empty) {
+        setUserRole('student');
+        setUserName(studentSnap.docs[0].data().name || 'Student');
+        return;
+      }
+
+      // 3. Unregistered
+      setUserRole(null);
+    } catch (err) {
+      console.error("Role detection error:", err);
+      // Fallback
+      setUserRole(null);
     }
   };
-
-  /* 
-     Fix: checkingRoleが永久にtrueのままになるのを防ぐため、
-     初期ロード完了後に強制的にfalseにするフェールセーフを入れる。 
-     また、onAuthStateChangedは信頼性が高いので、そこでの判定を主とする。
-  */
-  useEffect(() => {
-    // 5秒経ってもロードが終わらない場合は強制解除 (白画面対策)
-    const timer = setTimeout(() => {
-      if (loading || checkingRole) {
-        console.warn("Force ending loading state due to timeout");
-        setLoading(false);
-        setCheckingRole(false);
-      }
-    }, 5000);
-    return () => clearTimeout(timer);
-  }, [loading, checkingRole]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
-
       if (currentUser) {
-        // ログイン状態なら役割を確認
-        await checkUserRole(currentUser);
+        await detectRole(currentUser);
       } else {
-        // ログアウト状態なら役割なし
         setUserRole(null);
-        setCheckingRole(false);
+        setUserName('');
       }
       setLoading(false);
     });
-
     return () => unsubscribe();
   }, []);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-slate-500 text-sm font-medium animate-pulse">読み込み中...</p>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-slate-200 border-t-indigo-600 rounded-full animate-spin"></div>
+          <p className="text-slate-500 font-medium text-sm">Loading System...</p>
         </div>
       </div>
     );
   }
 
+  // Session Fallback for Students who didn't use Firebase Auth (legacy support)
+  const isSessionStudent = sessionStorage.getItem('clinical_student_id');
+
   return (
     <Router>
       <Routes>
-        {/* Public Routes */}
+        {/* Public / Entry */}
         <Route path="/" element={<StudentEntry />} />
 
-        {/* Admin Login - Always accessible if not admin */}
+        {/* Admin Login */}
         <Route
           path="/admin/login"
-          element={
-            user && userRole === 'admin' ? <Navigate to="/admin/dashboard" replace /> : <AdminLogin />
-          }
+          element={user && userRole === 'admin' ? <Navigate to="/admin/dashboard" replace /> : <AdminLogin />}
         />
+
+        {/* Admin Routes */}
+        <Route path="/admin/*" element={
+          user && userRole === 'admin' ? (
+            <Layout userRole="admin" userName={userName}>
+              <Routes>
+                <Route path="dashboard" element={<AdminDashboard />} />
+                <Route path="students" element={<StudentManagement />} />
+                <Route path="slots" element={<SlotManagement />} />
+                <Route path="approvals" element={<ResultApproval />} />
+                <Route path="settings" element={<SystemSettings />} />
+                <Route path="*" element={<Navigate to="dashboard" replace />} />
+              </Routes>
+            </Layout>
+          ) : (
+            <Navigate to="/admin/login" replace />
+          )
+        } />
 
         {/* Student Routes */}
-        <Route
-          path="/student/*"
-          element={
-            // セッションIDがあるかどうかで判定 (Auth認証よりもセッションを優先して学生とみなす簡便な実装)
-            sessionStorage.getItem('clinical_student_id') || (user && userRole === 'student') ? (
-              <Layout userRole="student" userName={sessionStorage.getItem('clinical_student_name') || userName || 'Student'}>
-                <Routes>
-                  <Route path="dashboard" element={<StudentDashboard />} />
-                  <Route path="reservation" element={<SlotReservation />} />
-                  <Route path="*" element={<Navigate to="dashboard" replace />} />
-                </Routes>
-              </Layout>
-            ) : (
-              <Navigate to="/" replace />
-            )
-          }
-        />
+        <Route path="/student/*" element={
+          (user && userRole === 'student') || isSessionStudent ? (
+            <Layout userRole="student" userName={userName || sessionStorage.getItem('clinical_student_name') || 'Student'}>
+              <Routes>
+                <Route path="dashboard" element={<StudentDashboard />} />
+                <Route path="reservation" element={<SlotReservation />} />
+                <Route path="*" element={<Navigate to="dashboard" replace />} />
+              </Routes>
+            </Layout>
+          ) : (
+            <Navigate to="/" replace />
+          )
+        } />
 
-        {/* Kiosk Route (Public/Protected by PIN) */}
+        {/* Site Kiosk */}
         <Route path="/site-kiosk" element={<SiteKiosk />} />
 
-        {/* Admin Protected Routes */}
-        <Route
-          path="/admin/*"
-          element={
-            /* checkUserRole中（checkingRole=true）の場合は、まだリダイレクトしないようにローディングを出すべきだが、
-               ここではloading=falseになっている前提なので、userRoleを見る。
-               もし管理者としてログイン中なら表示、そうでなければログインへ。
-            */
-            user && userRole === 'admin' ? (
-              <Layout userRole="admin" userName={userName}>
-                <Routes>
-                  <Route path="dashboard" element={<AdminDashboard />} />
-                  <Route path="slots" element={<SlotManagement />} />
-                  <Route path="students" element={<StudentManagement />} />
-                  <Route path="settings" element={<SystemSettings />} />
-                  <Route path="approvals" element={<ResultApproval />} />
-                  <Route path="*" element={<Navigate to="dashboard" replace />} />
-                </Routes>
-              </Layout>
-            ) : (
-              <Navigate to="/admin/login" replace />
-            )
-          }
-        />
-
-        {/* Fallback */}
+        {/* 404 Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

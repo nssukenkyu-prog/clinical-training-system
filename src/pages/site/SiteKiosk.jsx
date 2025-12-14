@@ -216,7 +216,7 @@ export default function SiteKiosk() {
             </header>
 
             {/* Main Content */}
-            <main className="relative z-10 container mx-auto p-8 h-[calc(100vh-100px)] grid grid-cols-2 gap-8">
+            <main className="relative z-10 container mx-auto p-4 md:p-8 h-[calc(100vh-100px)] grid grid-cols-1 lg:grid-cols-2 gap-8">
 
                 {/* Check-in Column */}
                 <div className="bg-slate-800/40 backdrop-blur-xl rounded-3xl border border-white/5 p-6 flex flex-col">

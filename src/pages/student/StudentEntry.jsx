@@ -1,14 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db, auth } from '../../lib/firebase';
-import { collection, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, updateDoc, doc, orderBy } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { User, ArrowRight, Activity, ShieldCheck, GraduationCap, Lock, Key } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function StudentEntry() {
     const [step, setStep] = useState('check'); // 'check', 'login', 'register'
-    const [studentNumber, setStudentNumber] = useState('');
+    const [students, setStudents] = useState([]);
+    const [selectedStudentId, setSelectedStudentId] = useState('');
     const [name, setName] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -17,49 +18,62 @@ export default function StudentEntry() {
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
-    const handleCheck = async (e) => {
-        e.preventDefault();
+    useEffect(() => {
+        const fetchStudents = async () => {
+            try {
+                const studentsRef = collection(db, 'students');
+                const q = query(studentsRef);
+                const querySnapshot = await getDocs(q);
+                let studentsData = querySnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+
+                // Sort client-side to avoid Firestore index requirements
+                studentsData.sort((a, b) => {
+                    if (a.grade !== b.grade) return a.grade - b.grade;
+                    return a.student_number.localeCompare(b.student_number);
+                });
+
+                setStudents(studentsData);
+            } catch (err) {
+                console.error("Error fetching students:", err);
+                setError('学生リストの読み込みに失敗しました。');
+            }
+        };
+        fetchStudents();
+    }, []);
+
+    const handleStudentSelect = (e) => {
+        const studentId = e.target.value;
+        setSelectedStudentId(studentId);
         setError('');
-        setLoading(true);
 
-        try {
-            // 1. 学籍番号で検索
-            const studentsRef = collection(db, 'students');
-            const q = query(studentsRef, where('student_number', '==', studentNumber));
-            const querySnapshot = await getDocs(q);
-
-            if (querySnapshot.empty) {
-                setError('学籍番号が見つかりません。');
-                setLoading(false);
-                return;
+        if (studentId) {
+            const student = students.find(s => s.id === studentId);
+            if (student) {
+                setStudentData(student);
+                setName(student.name); // Keep for display
             }
+        } else {
+            setStudentData(null);
+            setName('');
+        }
+    };
 
-            // 2. 氏名の一致確認
-            const docSnapshot = querySnapshot.docs[0];
-            const data = docSnapshot.data();
-            const dbName = data.name.replace(/\s+/g, '');
-            const inputName = name.replace(/\s+/g, '');
+    const handleNext = (e) => {
+        e.preventDefault();
+        if (!studentData) {
+            setError('学生を選択してください。');
+            return;
+        }
 
-            if (dbName !== inputName) {
-                setError('氏名が一致しません。');
-                setLoading(false);
-                return;
-            }
-
-            setStudentData({ id: docSnapshot.id, ...data });
-
-            // 3. パスワード設定状況で分岐
-            if (data.password_set) {
-                setStep('login');
-            } else {
-                setStep('register');
-            }
-
-        } catch (err) {
-            console.error(err);
-            setError('エラーが発生しました。');
-        } finally {
-            setLoading(false);
+        // 3. パスワード設定状況で分岐
+        // 変更: 初期パスワードがある場合はログイン画面へ
+        if (studentData.password_set || studentData.initial_password) {
+            setStep('login');
+        } else {
+            setStep('register');
         }
     };
 
@@ -68,20 +82,38 @@ export default function StudentEntry() {
         setError('');
         setLoading(true);
 
-        try {
-            await signInWithEmailAndPassword(auth, studentData.email, password);
+        console.log("Attempting login for:", studentData.email);
 
-            // セッション保存
+        try {
+            if (studentData.password_set) {
+                // Firebase Auth Login
+                await signInWithEmailAndPassword(auth, studentData.email, password);
+                console.log("Login successful (Auth)");
+            } else if (studentData.initial_password) {
+                // Initial Password Login (Local)
+                if (password !== studentData.initial_password) {
+                    throw new Error("初期パスワードが違います。");
+                }
+                console.log("Login successful (Initial Password)");
+            } else {
+                throw new Error("認証情報がありません。管理者に連絡してください。");
+            }
+
+            // セッション保存 (共通)
             sessionStorage.setItem('clinical_student_id', studentData.id);
             sessionStorage.setItem('clinical_student_name', studentData.name);
 
             navigate('/student/dashboard');
         } catch (err) {
-            console.error(err);
+            console.error("Login failed:", err);
             if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
                 setError('パスワードが正しくありません。');
+            } else if (err.code === 'auth/user-not-found') {
+                setError('認証情報が見つかりません。管理者に連絡してください (Auth User Missing)。');
+            } else if (err.code === 'auth/too-many-requests') {
+                setError('試行回数が多すぎます。しばらく待ってから再試行してください。');
             } else {
-                setError('ログインに失敗しました。');
+                setError(err.message || 'ログインに失敗しました。');
             }
         } finally {
             setLoading(false);
@@ -133,17 +165,17 @@ export default function StudentEntry() {
     return (
         <div className="min-h-screen flex bg-white">
             {/* Left Side - Hero / Branding (Desktop only) */}
-            <div className="hidden lg:flex lg:w-1/2 bg-slate-900 relative overflow-hidden flex-col justify-between p-12 text-white">
+            <div className="hidden lg:flex lg:w-1/2 bg-secondary relative overflow-hidden flex-col justify-between p-12 text-white">
                 <div className="absolute inset-0 z-0">
-                    <div className="absolute top-[-20%] left-[-20%] w-[80%] h-[80%] bg-blue-600/20 rounded-full blur-[120px]" />
-                    <div className="absolute bottom-[-20%] right-[-20%] w-[80%] h-[80%] bg-emerald-600/20 rounded-full blur-[120px]" />
+                    <div className="absolute top-[-20%] left-[-20%] w-[80%] h-[80%] bg-primary/20 rounded-full blur-[120px]" />
+                    <div className="absolute bottom-[-20%] right-[-20%] w-[80%] h-[80%] bg-accent/20 rounded-full blur-[120px]" />
                     <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')] bg-cover bg-center opacity-10 mix-blend-overlay"></div>
                 </div>
 
                 <div className="relative z-10">
                     <div className="flex items-center gap-3 mb-8">
                         <div className="p-2 bg-white/10 backdrop-blur-md rounded-lg border border-white/10">
-                            <Activity className="w-6 h-6 text-emerald-400" />
+                            <Activity className="w-6 h-6 text-accent" />
                         </div>
                         <span className="font-bold text-lg tracking-wide opacity-90">NSSU CLINICAL TRAINING</span>
                     </div>
@@ -155,7 +187,7 @@ export default function StudentEntry() {
                     >
                         <h1 className="text-5xl font-bold leading-tight mb-6">
                             未来の医療を担う<br />
-                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">
                                 プロフェッショナルへ
                             </span>
                         </h1>
@@ -168,11 +200,11 @@ export default function StudentEntry() {
 
                 <div className="relative z-10 flex gap-8 text-sm font-medium text-slate-400">
                     <div className="flex items-center gap-2">
-                        <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                        <ShieldCheck className="w-4 h-4 text-accent" />
                         <span>Secure Access</span>
                     </div>
                     <div className="flex items-center gap-2">
-                        <GraduationCap className="w-4 h-4 text-blue-400" />
+                        <GraduationCap className="w-4 h-4 text-primary" />
                         <span>Student Portal</span>
                     </div>
                 </div>
@@ -191,8 +223,8 @@ export default function StudentEntry() {
                                 transition={{ duration: 0.3 }}
                             >
                                 <div className="mb-10">
-                                    <h2 className="text-3xl font-bold text-slate-900 mb-2">ログイン</h2>
-                                    <p className="text-slate-500">学籍番号と氏名を入力してください</p>
+                                    <h2 className="text-3xl font-bold text-secondary mb-2">ログイン</h2>
+                                    <p className="text-slate-500">リストから自分の氏名を選択してください</p>
                                 </div>
 
                                 {error && (
@@ -202,35 +234,35 @@ export default function StudentEntry() {
                                     </div>
                                 )}
 
-                                <form onSubmit={handleCheck} className="space-y-6">
+                                <form onSubmit={handleNext} className="space-y-6">
                                     <div className="space-y-2">
-                                        <label className="text-sm font-bold text-slate-700">学籍番号</label>
-                                        <input
-                                            type="text"
-                                            className="w-full pl-4 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white text-slate-900 font-mono transition-all duration-200"
-                                            placeholder="2024001"
-                                            value={studentNumber}
-                                            onChange={(e) => setStudentNumber(e.target.value)}
-                                            required
-                                        />
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-bold text-slate-700">氏名</label>
-                                        <input
-                                            type="text"
-                                            className="w-full pl-4 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white text-slate-900 transition-all duration-200"
-                                            placeholder="日体 太郎"
-                                            value={name}
-                                            onChange={(e) => setName(e.target.value)}
-                                            required
-                                        />
+                                        <label className="text-sm font-bold text-slate-700">氏名選択</label>
+                                        <div className="relative">
+                                            <select
+                                                className="w-full pl-4 pr-10 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-primary focus:bg-white text-slate-900 font-bold transition-all duration-200 appearance-none"
+                                                value={selectedStudentId}
+                                                onChange={handleStudentSelect}
+                                                required
+                                            >
+                                                <option value="">選択してください</option>
+                                                {students.map(student => (
+                                                    <option key={student.id} value={student.id}>
+                                                        {student.grade}年 {student.student_number} {student.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                                                <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                                                </svg>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <button
                                         type="submit"
-                                        disabled={loading}
-                                        className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all duration-200 disabled:opacity-70 flex items-center justify-center gap-2"
+                                        disabled={loading || !selectedStudentId}
+                                        className="w-full py-4 bg-secondary text-white rounded-xl font-bold hover:bg-secondary/90 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                     >
                                         {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><span>次へ</span><ArrowRight className="w-4 h-4" /></>}
                                     </button>
@@ -248,7 +280,7 @@ export default function StudentEntry() {
                             >
                                 <div className="mb-10">
                                     <button onClick={() => setStep('check')} className="text-sm text-slate-400 hover:text-slate-600 mb-4 flex items-center gap-1">← 戻る</button>
-                                    <h2 className="text-3xl font-bold text-slate-900 mb-2">パスワード入力</h2>
+                                    <h2 className="text-3xl font-bold text-secondary mb-2">パスワード入力</h2>
                                     <p className="text-slate-500">おかえりなさい、{name}さん</p>
                                 </div>
 
@@ -266,7 +298,7 @@ export default function StudentEntry() {
                                             <Lock className="absolute left-4 top-4 w-5 h-5 text-slate-400" />
                                             <input
                                                 type="password"
-                                                className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white text-slate-900 transition-all duration-200"
+                                                className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-primary focus:bg-white text-slate-900 transition-all duration-200"
                                                 placeholder="••••••••"
                                                 value={password}
                                                 onChange={(e) => setPassword(e.target.value)}
@@ -278,7 +310,7 @@ export default function StudentEntry() {
                                     <button
                                         type="submit"
                                         disabled={loading}
-                                        className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all duration-200 disabled:opacity-70 flex items-center justify-center gap-2"
+                                        className="w-full py-4 bg-secondary text-white rounded-xl font-bold hover:bg-secondary/90 transition-all duration-200 disabled:opacity-70 flex items-center justify-center gap-2"
                                     >
                                         {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <span>ログイン</span>}
                                     </button>
@@ -296,7 +328,7 @@ export default function StudentEntry() {
                             >
                                 <div className="mb-10">
                                     <button onClick={() => setStep('check')} className="text-sm text-slate-400 hover:text-slate-600 mb-4 flex items-center gap-1">← 戻る</button>
-                                    <h2 className="text-3xl font-bold text-slate-900 mb-2">パスワード設定</h2>
+                                    <h2 className="text-3xl font-bold text-secondary mb-2">パスワード設定</h2>
                                     <p className="text-slate-500">初回ログインのため、パスワードを設定してください</p>
                                 </div>
 
@@ -314,7 +346,7 @@ export default function StudentEntry() {
                                             <Key className="absolute left-4 top-4 w-5 h-5 text-slate-400" />
                                             <input
                                                 type="password"
-                                                className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white text-slate-900 transition-all duration-200"
+                                                className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-primary focus:bg-white text-slate-900 transition-all duration-200"
                                                 placeholder="6文字以上"
                                                 value={password}
                                                 onChange={(e) => setPassword(e.target.value)}
@@ -330,7 +362,7 @@ export default function StudentEntry() {
                                             <Key className="absolute left-4 top-4 w-5 h-5 text-slate-400" />
                                             <input
                                                 type="password"
-                                                className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white text-slate-900 transition-all duration-200"
+                                                className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-primary focus:bg-white text-slate-900 transition-all duration-200"
                                                 placeholder="もう一度入力"
                                                 value={confirmPassword}
                                                 onChange={(e) => setConfirmPassword(e.target.value)}
@@ -343,7 +375,7 @@ export default function StudentEntry() {
                                     <button
                                         type="submit"
                                         disabled={loading}
-                                        className="w-full py-4 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all duration-200 disabled:opacity-70 flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
+                                        className="w-full py-4 bg-primary text-white rounded-xl font-bold hover:bg-primary/90 transition-all duration-200 disabled:opacity-70 flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
                                     >
                                         {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <span>設定して開始</span>}
                                     </button>

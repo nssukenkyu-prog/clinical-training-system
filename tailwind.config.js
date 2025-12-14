@@ -8,19 +8,23 @@ export default {
         extend: {
             colors: {
                 primary: {
-                    DEFAULT: '#0ea5e9', // Sky 500
+                    DEFAULT: '#0F7FFF', // Bright Blue (User Request)
                     foreground: '#ffffff',
                 },
                 secondary: {
-                    DEFAULT: '#64748b', // Slate 500
+                    DEFAULT: '#031933', // Dark Navy (User Request)
                     foreground: '#ffffff',
                 },
                 accent: {
-                    DEFAULT: '#f43f5e', // Rose 500
+                    DEFAULT: '#FF4C29', // Orange/Red from snippet (inferred)
                     foreground: '#ffffff',
                 },
-                background: '#ffffff', // White
-                surface: '#f8fafc', // Slate 50
+                background: '#F5F5F5', // Light Gray
+                surface: '#ffffff', // White
+                text: {
+                    main: '#232425',
+                    muted: '#909499'
+                }
             },
             fontFamily: {
                 sans: ['Inter', 'sans-serif'],

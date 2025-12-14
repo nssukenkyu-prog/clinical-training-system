@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, query, getDocs, addDoc, writeBatch, doc, where, orderBy, deleteDoc, updateDoc } from 'firebase/firestore';
-import { Users, Search, Plus, Upload, Mail, Check, X, Filter, Trash2, Edit } from 'lucide-react';
+import { Users, Search, Plus, Upload, Mail, Check, X, Filter, Trash2, Pencil, Clock } from 'lucide-react';
 import { clsx } from 'clsx';
 
 export default function StudentManagement() {
@@ -9,6 +9,8 @@ export default function StudentManagement() {
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [showBulkModal, setShowBulkModal] = useState(false);
+    const [showDetailModal, setShowDetailModal] = useState(false);
+    const [selectedStudentForDetail, setSelectedStudentForDetail] = useState(null);
     const [formData, setFormData] = useState({
         studentNumber: '',
         email: '',
@@ -57,6 +59,16 @@ export default function StudentManagement() {
         }
     };
 
+    // Helper to generate random 8 char password
+    const generatePassword = () => {
+        const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+        let pass = "";
+        for (let i = 0; i < 8; i++) {
+            pass += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return pass;
+    };
+
     const getFilteredStudents = () => {
         return students.filter(s => {
             if (filter.grade !== 'all' && s.grade !== parseInt(filter.grade)) return false;
@@ -75,8 +87,9 @@ export default function StudentManagement() {
                 name: formData.name,
                 grade: formData.grade,
                 training_type: formData.trainingType,
-                auth_user_id: null, // Will be linked upon registration
+                auth_user_id: null,
                 password_set: false,
+                initial_password: generatePassword(), // Store initial password for admin view
                 created_at: new Date().toISOString()
             });
 
@@ -113,6 +126,7 @@ export default function StudentManagement() {
                     grade: parseInt(grade) || 2,
                     training_type: trainingType || 'I',
                     password_set: false,
+                    initial_password: generatePassword(),
                     auth_user_id: null,
                     created_at: new Date().toISOString()
                 });
@@ -234,6 +248,14 @@ export default function StudentManagement() {
             console.error("Error updating student:", error);
             alert('更新に失敗しました');
         }
+    };
+
+    const handleRowClick = (student, e) => {
+        // Prevent modal open if checkbox or action buttons are clicked
+        if (e.target.closest('button') || e.target.closest('input[type="checkbox"]')) return;
+
+        setSelectedStudentForDetail(student);
+        setShowDetailModal(true);
     };
 
     // Modify handleAddStudent to verify if we are editing or adding
@@ -410,14 +432,18 @@ export default function StudentManagement() {
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500">氏名</th>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500">学年</th>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500">実習区分</th>
+                                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500">パスワード</th>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500">累積時間</th>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500">ステータス</th>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500">操作</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {filteredStudents.map(student => (
-                                <tr key={student.id} className={`hover:bg-slate-50 transition-colors ${selectedStudentIds.has(student.id) ? 'bg-slate-50' : ''}`}>
+                                <tr
+                                    key={student.id}
+                                    className={`hover:bg-slate-50 transition-colors cursor-pointer ${selectedStudentIds.has(student.id) ? 'bg-slate-50' : ''}`}
+                                    onClick={(e) => handleRowClick(student, e)}
+                                >
                                     <td className="px-6 py-4">
                                         <input
                                             type="checkbox"
@@ -434,25 +460,26 @@ export default function StudentManagement() {
                                             {getTrainingTypeLabel(student.training_type)}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 text-sm font-mono text-primary font-bold">{formatTime(getTotalMinutes(student))}</td>
-                                    <td className="px-6 py-4">
-                                        {student.auth_user_id ? (
-                                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">
-                                                <Check className="w-3 h-3" /> 登録済
-                                            </span>
+                                    <td className="px-6 py-4 text-sm font-mono text-slate-600">
+                                        {student.initial_password ? (
+                                            <div className="flex items-center gap-1">
+                                                <span className="bg-slate-100 px-2 py-1 rounded border border-slate-200">{student.initial_password}</span>
+                                                <span className="text-[10px] text-green-600 bg-green-50 px-1 rounded border border-green-100">未変更</span>
+                                            </div>
+                                        ) : student.password_set ? (
+                                            <span className="text-xs text-slate-400">変更済</span>
                                         ) : (
-                                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-bold bg-amber-50 text-amber-600 border border-amber-100">
-                                                <Mail className="w-3 h-3" /> 未設定
-                                            </span>
+                                            <span className="text-xs text-red-400">未設定</span>
                                         )}
                                     </td>
+                                    <td className="px-6 py-4 text-sm font-mono text-primary font-bold">{formatTime(getTotalMinutes(student))}</td>
                                     <td className="px-6 py-4 flex items-center gap-3">
                                         <button
                                             onClick={() => handleEditClick(student)}
                                             className="text-slate-400 hover:text-indigo-600 transition-colors p-1"
                                             title="編集"
                                         >
-                                            <Edit className="w-4 h-4" />
+                                            <Pencil className="w-4 h-4" />
                                         </button>
                                         <button
                                             onClick={() => handleDeleteStudent(student)}
@@ -607,6 +634,97 @@ export default function StudentManagement() {
                     </div>
                 )
             }
-        </div >
+
+            {/* Student Detail Modal */}
+            {
+                showDetailModal && selectedStudentForDetail && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setShowDetailModal(false)}>
+                        <div className="glass-panel p-6 rounded-2xl w-full max-w-lg bg-white shadow-2xl overflow-y-auto max-h-[80vh]" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center justify-between mb-6">
+                                <div>
+                                    <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                                        {selectedStudentForDetail.name}
+                                        <span className="text-sm font-normal text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full font-mono">{selectedStudentForDetail.student_number}</span>
+                                    </h3>
+                                    <p className="text-slate-500 text-sm">{selectedStudentForDetail.grade}年 / 実習{selectedStudentForDetail.training_type}</p>
+                                </div>
+                                <button onClick={() => setShowDetailModal(false)} className="text-slate-400 hover:text-slate-600">
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+
+                            <div className="space-y-6">
+                                {/* Stats Cards */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="p-4 rounded-xl bg-indigo-50 border border-indigo-100">
+                                        <div className="text-xs text-indigo-600 font-bold mb-1 uppercase tracking-wider">現在の累積時間</div>
+                                        <div className="text-2xl font-bold text-indigo-900">
+                                            {formatTime(getTotalMinutes(selectedStudentForDetail))}
+                                        </div>
+                                    </div>
+                                    <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-100">
+                                        <div className="text-xs text-emerald-600 font-bold mb-1 uppercase tracking-wider">予約数</div>
+                                        <div className="text-2xl font-bold text-emerald-900">
+                                            {selectedStudentForDetail.reservations?.length || 0}
+                                            <span className="text-sm font-medium text-emerald-600 ml-1">件</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Reservations List */}
+                                <div>
+                                    <h4 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
+                                        <Clock className="w-4 h-4 text-slate-400" />
+                                        実習履歴
+                                    </h4>
+                                    {(selectedStudentForDetail.reservations || []).length === 0 ? (
+                                        <div className="text-center py-6 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-400 text-sm">
+                                            履歴はありません
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {[...selectedStudentForDetail.reservations].sort((a, b) => new Date(b.slot_date) - new Date(a.slot_date)).map((r, i) => (
+                                                <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-100">
+                                                    <div>
+                                                        <div className="font-bold text-slate-700 text-sm">
+                                                            {r.slot_date} {r.slot_start_time.slice(0, 5)}-{r.slot_end_time.slice(0, 5)}
+                                                        </div>
+                                                        <div className="text-xs text-slate-500">
+                                                            実習{r.slot_training_type}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex flex-col items-end gap-1">
+                                                        <span className={clsx(
+                                                            "text-[10px] px-2 py-0.5 rounded-full font-bold",
+                                                            r.status === 'completed' ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"
+                                                        )}>
+                                                            {r.status === 'completed' ? '承認済' : '予約中'}
+                                                        </span>
+                                                        {r.actual_minutes && (
+                                                            <span className="text-xs font-mono font-bold text-slate-600">
+                                                                {Math.floor(r.actual_minutes / 60)}h{r.actual_minutes % 60}m
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="pt-4 border-t border-slate-100">
+                                    <button
+                                        onClick={() => setShowDetailModal(false)}
+                                        className="w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold transition-colors"
+                                    >
+                                        閉じる
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+        </div>
     );
 }

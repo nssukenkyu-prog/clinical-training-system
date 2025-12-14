@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { db } from '../../lib/firebase';
 import { collection, query, where, getDocs, getCountFromServer } from 'firebase/firestore';
-import { Users, Calendar, CheckSquare, Clock, ArrowRight, Activity, Download } from 'lucide-react';
+import { Users, Calendar, SquareCheck, Clock, ArrowRight, Activity, Download } from 'lucide-react';
 import { clsx } from 'clsx';
 
 export default function AdminDashboard() {
@@ -207,7 +207,7 @@ export default function AdminDashboard() {
     }
 
     return (
-        <div className="space-y-8 pt-10">
+        <div className="space-y-8 pt-10 relative">
             <div className="flex justify-between items-start">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900 tracking-tight">管理者ダッシュボード</h1>
@@ -248,7 +248,7 @@ export default function AdminDashboard() {
                 <StatCard
                     label="承認済の実習"
                     value={stats.completedTrainings}
-                    icon={CheckSquare}
+                    icon={SquareCheck}
                     color="text-purple-600"
                     bg="bg-purple-50"
                 />
@@ -377,7 +377,7 @@ export default function AdminDashboard() {
                         <Link to="/admin/approvals" className="bg-white border border-slate-200 w-full p-4 rounded-xl flex items-center justify-between group hover:bg-slate-50 hover:shadow-sm transition-all">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 rounded-lg bg-purple-50 text-purple-600 border border-purple-100">
-                                    <CheckSquare className="w-5 h-5" />
+                                    <SquareCheck className="w-5 h-5" />
                                 </div>
                                 <span className="font-medium text-slate-700 group-hover:text-slate-900">実績を承認</span>
                             </div>

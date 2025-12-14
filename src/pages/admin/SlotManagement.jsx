@@ -283,7 +283,7 @@ export default function SlotManagement() {
     if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div></div>;
 
     return (
-        <div className="space-y-8 pt-10">
+        <div className="space-y-8 pt-10 relative">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900">実習枠管理</h1>
