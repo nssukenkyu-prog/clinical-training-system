@@ -127,23 +127,71 @@ export default function ResultApproval() {
                             headers: { 'Content-Type': 'application/json' },
                             mode: 'no-cors',
                             body: JSON.stringify({
-                                to: reservation.student.email,
                                 subject: '【臨床実習】実習承認のお知らせ',
                                 body: `
 <!DOCTYPE html>
 <html>
-<body style="font-family: sans-serif; padding: 20px;">
-  <h2 style="color: #4f46e5;">実習承認のお知らせ</h2>
-  <p>${reservation.student.name} 様</p>
-  <p>以下の実習実績が承認されました。</p>
-  <div style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin: 20px 0;">
-    <ul style="list-style: none; padding: 0;">
-      <li style="margin-bottom: 8px;">📅 <b>日時:</b> ${formatDate(reservation.slot.date)} ${reservation.slot.start_time.slice(0, 5)} - ${reservation.slot.end_time.slice(0, 5)}</li>
-      <li style="margin-bottom: 8px;">📋 <b>実習:</b> 臨床実習 ${reservation.slot.training_type}</li>
-      <li>⏱ <b>認定時間:</b> ${Math.floor(actualMinutes / 60)}時間${actualMinutes % 60}分</li>
-    </ul>
+<head>
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<style>
+  :root { color-scheme: light dark; supported-color-schemes: light dark; }
+  body { font-family: -apple-system, sans-serif; line-height: 1.6; color: #1e293b; background-color: #f8fafc; margin: 0; padding: 0; }
+  .container { max-width: 600px; margin: 20px auto; padding: 20px; }
+  .card { background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid #e2e8f0; }
+  .header { background-color: #10b981; padding: 24px; text-align: center; } /* Emerald for Approval */
+  .header h1 { color: #ffffff; margin: 0; font-size: 20px; font-weight: 700; }
+  .content { padding: 32px 24px; }
+  .content h2 { color: #0f172a; margin-top: 0; font-size: 18px; text-align: center; margin-bottom: 24px; }
+  .info-box { background-color: #f1f5f9; border-radius: 12px; padding: 20px; margin: 24px 0; border: 1px solid #e2e8f0; }
+  .info-row { display: flex; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 8px; }
+  .info-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .label { font-size: 13px; color: #64748b; font-weight: 600; }
+  .value { font-size: 15px; color: #334155; font-weight: 600; text-align: right; }
+  .footer { text-align: center; padding: 24px; color: #94a3b8; font-size: 12px; }
+  
+  @media (prefers-color-scheme: dark) {
+    body { background-color: #0f172a !important; color: #e2e8f0 !important; }
+    .card { background-color: #1e293b !important; border-color: #334155 !important; box-shadow: none !important; }
+    .content h2 { color: #f8fafc !important; }
+    .info-box { background-color: #334155 !important; border-color: #475569 !important; }
+    .label { color: #94a3b8 !important; }
+    .value { color: #f1f5f9 !important; }
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="header">
+        <h1>実習承認のお知らせ</h1>
+      </div>
+      <div class="content">
+        <h2>${reservation.student.name} 様</h2>
+        <p>以下の実習実績が正式に承認されました。</p>
+        
+        <div class="info-box">
+          <div class="info-row">
+            <span class="label">日時</span>
+            <span class="value">${formatDate(reservation.slot.date)}<br>${reservation.slot.start_time.slice(0, 5)} - ${reservation.slot.end_time.slice(0, 5)}</span>
+          </div>
+          <div class="info-row">
+            <span class="label">実習区分</span>
+            <span class="value">臨床実習 ${reservation.slot.training_type}</span>
+          </div>
+          <div class="info-row">
+            <span class="label">認定時間</span>
+            <span class="value" style="color: #10b981;">${Math.floor(actualMinutes / 60)}時間${actualMinutes % 60}分</span>
+          </div>
+        </div>
+        
+        <p style="text-align: center; font-size: 14px; color: #64748b;">マイページで累積時間を確認できます。</p>
+      </div>
+    </div>
+    <div class="footer">
+      &copy; NSSU Clinical Training System
+    </div>
   </div>
-  <p style="color: #64748b; font-size: 0.9em;">※マイページで累積時間を確認できます。</p>
 </body>
 </html>`
                             })
@@ -193,17 +241,61 @@ export default function ResultApproval() {
                                 body: `
 <!DOCTYPE html>
 <html>
-<body style="font-family: sans-serif; padding: 20px;">
-  <h2 style="color: #be123c;">実習キャンセルのお知らせ</h2>
-  <p>${reservation.student.name} 様</p>
-  <p>以下の実習予約が管理者によりキャンセルされました。</p>
-  <div style="background: #fff1f2; padding: 15px; border-radius: 8px; border: 1px solid #fecdd3; margin: 20px 0;">
-    <ul style="list-style: none; padding: 0;">
-      <li style="margin-bottom: 8px;">📅 <b>日時:</b> ${formatDate(reservation.slot.date)} ${reservation.slot.start_time.slice(0, 5)} - ${reservation.slot.end_time.slice(0, 5)}</li>
-      <li>📋 <b>実習:</b> 臨床実習 ${reservation.slot.training_type}</li>
-    </ul>
+<head>
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<style>
+  :root { color-scheme: light dark; supported-color-schemes: light dark; }
+  body { font-family: -apple-system, sans-serif; line-height: 1.6; color: #1e293b; background-color: #f8fafc; margin: 0; padding: 0; }
+  .container { max-width: 600px; margin: 20px auto; padding: 20px; }
+  .card { background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid #e2e8f0; }
+  .header { background-color: #ef4444; padding: 24px; text-align: center; } /* Red for Cancellation */
+  .header h1 { color: #ffffff; margin: 0; font-size: 20px; font-weight: 700; }
+  .content { padding: 32px 24px; }
+  .content h2 { color: #0f172a; margin-top: 0; font-size: 18px; text-align: center; margin-bottom: 24px; }
+  .info-box { background-color: #fef2f2; border-radius: 12px; padding: 20px; margin: 24px 0; border: 1px solid #fee2e2; }
+  .info-row { display: flex; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px dashed #fecaca; padding-bottom: 8px; }
+  .info-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .label { font-size: 13px; color: #991b1b; font-weight: 600; }
+  .value { font-size: 15px; color: #7f1d1d; font-weight: 600; text-align: right; }
+  .footer { text-align: center; padding: 24px; color: #94a3b8; font-size: 12px; }
+  
+  @media (prefers-color-scheme: dark) {
+    body { background-color: #0f172a !important; color: #e2e8f0 !important; }
+    .card { background-color: #1e293b !important; border-color: #334155 !important; box-shadow: none !important; }
+    .content h2 { color: #f8fafc !important; }
+    .info-box { background-color: #450a0a !important; border-color: #7f1d1d !important; }
+    .label { color: #fecaca !important; }
+    .value { color: #fef2f2 !important; }
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="header">
+        <h1>実習キャンセルのお知らせ</h1>
+      </div>
+      <div class="content">
+        <h2>${reservation.student.name} 様</h2>
+        <p>以下の実習予約が管理者によりキャンセルされました。<br>理由等の詳細は教員までご確認ください。</p>
+        
+        <div class="info-box">
+          <div class="info-row">
+            <span class="label">日時</span>
+            <span class="value">${formatDate(reservation.slot.date)}<br>${reservation.slot.start_time.slice(0, 5)} - ${reservation.slot.end_time.slice(0, 5)}</span>
+          </div>
+          <div class="info-row">
+            <span class="label">実習区分</span>
+            <span class="value">臨床実習 ${reservation.slot.training_type}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="footer">
+      &copy; NSSU Clinical Training System
+    </div>
   </div>
-  <p style="color: #64748b; font-size: 0.9em;">ご不明な点がございましたら教員までお問い合わせください。</p>
 </body>
 </html>`
                             })
