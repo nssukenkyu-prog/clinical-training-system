@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, query, getDocs, addDoc, writeBatch, doc, where, orderBy, deleteDoc, updateDoc } from 'firebase/firestore';
-import { Users, Search, Plus, Upload, Mail, Check, X, Filter, Trash2, Pencil, Clock } from 'lucide-react';
+import { Users, Search, Plus, Upload, Mail, Check, X, Filter, Trash2, Pencil, Clock, Eye, EyeOff, RefreshCw, Key } from 'lucide-react';
 import { clsx } from 'clsx';
 
 export default function StudentManagement() {
@@ -23,6 +23,9 @@ export default function StudentManagement() {
     const [filter, setFilter] = useState({ grade: 'all', trainingType: 'all' });
     const [sending, setSending] = useState(false);
     const [selectedStudentIds, setSelectedStudentIds] = useState(new Set());
+    const [visiblePasswords, setVisiblePasswords] = useState(new Set());
+    const [resetRegistration, setResetRegistration] = useState(false);
+    const [inputPassword, setInputPassword] = useState('');
 
     useEffect(() => {
         loadStudents();
@@ -89,7 +92,7 @@ export default function StudentManagement() {
                 training_type: formData.trainingType,
                 auth_user_id: null,
                 password_set: false,
-                initial_password: generatePassword(), // Store initial password for admin view
+                initial_password: inputPassword || generatePassword(),
                 created_at: new Date().toISOString()
             });
 
@@ -98,6 +101,7 @@ export default function StudentManagement() {
 
             setShowModal(false);
             setFormData({ studentNumber: '', email: '', name: '', grade: 2, trainingType: 'I' });
+            setInputPassword('');
             loadStudents();
             alert('学生を登録しました。');
 
@@ -223,6 +227,8 @@ export default function StudentManagement() {
             grade: student.grade,
             trainingType: student.training_type
         });
+        setInputPassword(student.initial_password || '');
+        setResetRegistration(false);
         setShowModal(true);
     };
 
@@ -231,13 +237,24 @@ export default function StudentManagement() {
         if (!editingStudent) return;
 
         try {
-            await updateDoc(doc(db, 'students', editingStudent.id), {
+            const updates = {
                 student_number: formData.studentNumber,
                 email: formData.email,
                 name: formData.name,
                 grade: formData.grade,
-                training_type: formData.trainingType
-            });
+                training_type: formData.trainingType,
+            };
+
+            // Password update logic
+            if (inputPassword !== editingStudent.initial_password || resetRegistration) {
+                updates.initial_password = inputPassword;
+                if (resetRegistration || !editingStudent.password_set) {
+                    updates.password_set = false;
+                    updates.auth_user_id = null; // Reset auth link
+                }
+            }
+
+            await updateDoc(doc(db, 'students', editingStudent.id), updates);
 
             alert('更新しました');
             setShowModal(false);
@@ -277,6 +294,16 @@ export default function StudentManagement() {
             newSelected.add(studentId);
         }
         setSelectedStudentIds(newSelected);
+    };
+
+    const togglePasswordVisibility = (studentId) => {
+        const newVisible = new Set(visiblePasswords);
+        if (newVisible.has(studentId)) {
+            newVisible.delete(studentId);
+        } else {
+            newVisible.add(studentId);
+        }
+        setVisiblePasswords(newVisible);
     };
 
     const handleSelectAll = (e) => {
@@ -358,6 +385,7 @@ export default function StudentManagement() {
                         onClick={() => {
                             setEditingStudent(null);
                             setFormData({ studentNumber: '', email: '', name: '', grade: 2, trainingType: 'I' });
+                            setInputPassword(generatePassword());
                             setShowModal(true);
                         }}
                         className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
@@ -384,7 +412,7 @@ export default function StudentManagement() {
             </div >
 
             {/* Filters */}
-            < div className="glass-panel p-4 rounded-xl flex flex-wrap items-center gap-4 bg-white shadow-sm border border-slate-200" >
+            <div className="glass-panel p-4 rounded-xl flex flex-wrap items-center gap-4 bg-white shadow-sm border border-slate-200">
                 <div className="flex items-center gap-2 text-slate-500">
                     <Filter className="w-4 h-4" />
                     <span className="text-sm font-medium">フィルター:</span>
@@ -461,16 +489,29 @@ export default function StudentManagement() {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-sm font-mono text-slate-600">
-                                        {student.initial_password ? (
-                                            <div className="flex items-center gap-1">
-                                                <span className="bg-slate-100 px-2 py-1 rounded border border-slate-200">{student.initial_password}</span>
-                                                <span className="text-[10px] text-green-600 bg-green-50 px-1 rounded border border-green-100">未変更</span>
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex flex-col">
+                                                <div className="flex items-center gap-1">
+                                                    <span className="bg-slate-100 px-2 py-1 rounded border border-slate-200 min-w-[80px] text-center">
+                                                        {visiblePasswords.has(student.id) ? student.initial_password : '••••••••'}
+                                                    </span>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            togglePasswordVisibility(student.id);
+                                                        }}
+                                                        className="p-1 text-slate-400 hover:text-indigo-600 transition-colors"
+                                                    >
+                                                        {visiblePasswords.has(student.id) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                                    </button>
+                                                </div>
+                                                {student.password_set ? (
+                                                    <span className="text-[10px] text-slate-400 mt-1">変更済 (ログイン可能)</span>
+                                                ) : (
+                                                    <span className="text-[10px] text-rose-500 font-medium mt-1">未設定 (初期PWのみ)</span>
+                                                )}
                                             </div>
-                                        ) : student.password_set ? (
-                                            <span className="text-xs text-slate-400">変更済</span>
-                                        ) : (
-                                            <span className="text-xs text-red-400">未設定</span>
-                                        )}
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4 text-sm font-mono text-primary font-bold">{formatTime(getTotalMinutes(student))}</td>
                                     <td className="px-6 py-4 flex items-center gap-3">
@@ -494,7 +535,8 @@ export default function StudentManagement() {
                         </tbody>
                     </table>
                 </div>
-            </div >
+            </div>
+
 
             {/* Add/Edit Student Modal */}
             {
@@ -569,6 +611,52 @@ export default function StudentManagement() {
                                             <option value="II">実習Ⅱ</option>
                                             <option value="IV">実習Ⅳ</option>
                                         </select>
+                                    </div>
+                                </div>
+
+                                <div className="border-t border-slate-100 pt-4 mt-2">
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">パスワード設定</label>
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="text-xs text-slate-500 mb-1 block">初期パスワード</label>
+                                            <div className="flex items-center gap-2">
+                                                <div className="relative flex-1">
+                                                    <Key className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                                                    <input
+                                                        type="text"
+                                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-10 pr-4 py-2 focus:outline-none focus:border-primary text-slate-900 transition-colors font-mono"
+                                                        value={inputPassword}
+                                                        onChange={e => setInputPassword(e.target.value)}
+                                                        placeholder="パスワード"
+                                                        required
+                                                    />
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setInputPassword(generatePassword())}
+                                                    className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors"
+                                                    title="新しいパスワードを生成"
+                                                >
+                                                    <RefreshCw className="w-5 h-5" />
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {editingStudent && editingStudent.password_set && (
+                                            <div className="flex items-start gap-3 p-3 bg-amber-50 rounded-lg border border-amber-100">
+                                                <input
+                                                    type="checkbox"
+                                                    id="resetRegistration"
+                                                    className="mt-1 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                                                    checked={resetRegistration}
+                                                    onChange={e => setResetRegistration(e.target.checked)}
+                                                />
+                                                <label htmlFor="resetRegistration" className="text-sm text-amber-800 cursor-pointer">
+                                                    <span className="font-bold block text-xs mb-0.5">登録状態をリセットする</span>
+                                                    学生は次回ログイン時に、この初期パスワードを使って再度パスワードを設定する必要があります。
+                                                </label>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
@@ -725,6 +813,6 @@ export default function StudentManagement() {
                     </div>
                 )
             }
-        </div>
+        </div >
     );
 }

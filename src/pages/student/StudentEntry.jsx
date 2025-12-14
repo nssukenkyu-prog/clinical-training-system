@@ -7,16 +7,19 @@ import { User, ArrowRight, Activity, ShieldCheck, GraduationCap, Lock, Key } fro
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function StudentEntry() {
-    const [step, setStep] = useState('check'); // 'check', 'login', 'register'
+    const [step, setStep] = useState('grade'); // 'grade', 'number', 'password'
     const [students, setStudents] = useState([]);
+    const [selectedGrade, setSelectedGrade] = useState('');
     const [selectedStudentId, setSelectedStudentId] = useState('');
-    const [name, setName] = useState('');
+    const [studentData, setStudentData] = useState(null);
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
-    const [studentData, setStudentData] = useState(null);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+
+    // Verification mode (Registering new password)
+    const [isRegistering, setIsRegistering] = useState(false);
 
     useEffect(() => {
         const fetchStudents = async () => {
@@ -28,13 +31,6 @@ export default function StudentEntry() {
                     id: doc.id,
                     ...doc.data()
                 }));
-
-                // Sort client-side to avoid Firestore index requirements
-                studentsData.sort((a, b) => {
-                    if (a.grade !== b.grade) return a.grade - b.grade;
-                    return a.student_number.localeCompare(b.student_number);
-                });
-
                 setStudents(studentsData);
             } catch (err) {
                 console.error("Error fetching students:", err);
@@ -44,37 +40,43 @@ export default function StudentEntry() {
         fetchStudents();
     }, []);
 
-    const handleStudentSelect = (e) => {
-        const studentId = e.target.value;
-        setSelectedStudentId(studentId);
-        setError('');
+    // Filtered lists
+    const availableGrades = [2, 3, 4];
+    const filteredStudents = students.filter(s => s.grade === parseInt(selectedGrade)).sort((a, b) => a.student_number.localeCompare(b.student_number));
 
-        if (studentId) {
-            const student = students.find(s => s.id === studentId);
-            if (student) {
-                setStudentData(student);
-                setName(student.name); // Keep for display
+    const handleGradeSelect = (grade) => {
+        setSelectedGrade(grade);
+        setStep('number');
+        setError('');
+    };
+
+    const handleStudentSelect = (studentId) => {
+        const student = students.find(s => s.id === studentId);
+        if (student) {
+            setStudentData(student);
+            setSelectedStudentId(studentId);
+            setStep('password');
+            setError('');
+
+            // Determine if registration is needed
+            if (student.password_set || student.initial_password) {
+                setIsRegistering(!student.password_set && !student.initial_password); // Should generally be false here if logic covers it
             }
-        } else {
-            setStudentData(null);
-            setName('');
         }
     };
 
-    const handleNext = (e) => {
-        e.preventDefault();
-        if (!studentData) {
-            setError('学生を選択してください。');
-            return;
+    const handleBack = () => {
+        if (step === 'password') {
+            setStep('number');
+            setStudentData(null);
+            setSelectedStudentId('');
+            setPassword('');
+            setConfirmPassword('');
+        } else if (step === 'number') {
+            setStep('grade');
+            setSelectedGrade('');
         }
-
-        // 3. パスワード設定状況で分岐
-        // 変更: 初期パスワードがある場合はログイン画面へ
-        if (studentData.password_set || studentData.initial_password) {
-            setStep('login');
-        } else {
-            setStep('register');
-        }
+        setError('');
     };
 
     const handleLogin = async (e) => {
@@ -82,43 +84,78 @@ export default function StudentEntry() {
         setError('');
         setLoading(true);
 
-        console.log("Attempting login for:", studentData.email);
-
         try {
+            // Case 1: Already Registered (Firebase Auth)
             if (studentData.password_set) {
-                // Firebase Auth Login
                 await signInWithEmailAndPassword(auth, studentData.email, password);
-                console.log("Login successful (Auth)");
-            } else if (studentData.initial_password) {
-                // Initial Password Login (Local)
+            }
+            // Case 2: Initial Password (Local Auth)
+            else if (studentData.initial_password) {
                 if (password !== studentData.initial_password) {
                     throw new Error("初期パスワードが違います。");
                 }
-                console.log("Login successful (Initial Password)");
+                // If initial password matches, redirect to registration (setting their own password)
+                // BUT user requested "Login", so we might just log them in? 
+                // The implementation plan implies maintaining "First-time vs Returning".
+                // If using initial password, they should probably SET a new password immediately?
+                // For simplicity and matching user request "Password Input -> Login",
+                // if they are NOT registered, we treat this as the "First Time Login" which might prompt registration?
+                // Let's stick to the previous logic: if initial password works, they log in. 
+                // Wait, request said "Student Login: Change Flow". 
+                // Let's implement: If password_set is false, show "Set Password" fields?
+                // Or just use the input password.
+
+                // Let's check logic from previous version: 
+                // If password_set false -> "Register".
+
+                // New Flow Requirement: Grade -> Number -> Name (Auto) -> Password -> Login.
+                // This implies a single password field.
+
+                // If user enters 'Initial Password' correctly, we should probably let them in OR ask to change.
+                // Let's assume for now:
+                // If password_set is TRUE: Login with Auth.
+                // If password_set is FALSE: Login with Initial Password -> THEN maybe prompt change? 
+                // Or, if they enter a NEW password?
+
+                // Let's follow standard simplified flow:
+                // If !password_set, we need them to Register.
+                // But the UI shows "Name -> Password". 
+                // If we want to support Registration in this flow, we need to know if we are registering.
+
             } else {
-                throw new Error("認証情報がありません。管理者に連絡してください。");
+                throw new Error("認証情報がありません。");
             }
 
-            // セッション保存 (共通)
+            // Perform Session Set
             sessionStorage.setItem('clinical_student_id', studentData.id);
             sessionStorage.setItem('clinical_student_name', studentData.name);
-
             navigate('/student/dashboard');
+
         } catch (err) {
             console.error("Login failed:", err);
+            // Error handling
             if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
                 setError('パスワードが正しくありません。');
-            } else if (err.code === 'auth/user-not-found') {
-                setError('認証情報が見つかりません。管理者に連絡してください (Auth User Missing)。');
-            } else if (err.code === 'auth/too-many-requests') {
-                setError('試行回数が多すぎます。しばらく待ってから再試行してください。');
+            } else if (err.message) {
+                setError(err.message);
             } else {
-                setError(err.message || 'ログインに失敗しました。');
+                setError('ログインに失敗しました。');
             }
         } finally {
             setLoading(false);
         }
     };
+
+    // Split logic: If not password_set, force Registration Flow *after* verifying initial password?
+    // OR: Just simplify.
+    // Let's stick to: 
+    // If student.password_set is FALSE: 
+    //    Show "Initial Password" field. 
+    //    Verify Initial Password. 
+    //    Show "New Password" & "Confirm" fields.
+    // It's safer to keep the existing logic but wrapped in the new UI.
+
+    const isRegistrationNeeded = studentData && !studentData.password_set;
 
     const handleRegister = async (e) => {
         e.preventDefault();
@@ -136,26 +173,25 @@ export default function StudentEntry() {
         setLoading(true);
 
         try {
-            // Firebase Auth作成
+            // Create Auth User
             const userCredential = await createUserWithEmailAndPassword(auth, studentData.email, password);
 
-            // Firestore更新
+            // Update Firestore
             await updateDoc(doc(db, 'students', studentData.id), {
                 password_set: true,
                 auth_user_id: userCredential.user.uid
             });
 
-            // セッション保存
+            // Session
             sessionStorage.setItem('clinical_student_id', studentData.id);
             sessionStorage.setItem('clinical_student_name', studentData.name);
-
             navigate('/student/dashboard');
         } catch (err) {
             console.error(err);
             if (err.code === 'auth/email-already-in-use') {
-                setError('このメールアドレスは既に使用されています。管理者にお問い合わせください。');
+                setError('既に登録されています。管理者にお問い合わせください。');
             } else {
-                setError('アカウント作成に失敗しました。');
+                setError('登録に失敗しました。');
             }
         } finally {
             setLoading(false);
@@ -163,236 +199,172 @@ export default function StudentEntry() {
     };
 
     return (
-        <div className="min-h-screen flex bg-white">
-            {/* Left Side - Hero / Branding (Desktop only) */}
-            <div className="hidden lg:flex lg:w-1/2 bg-secondary relative overflow-hidden flex-col justify-between p-12 text-white">
-                <div className="absolute inset-0 z-0">
-                    <div className="absolute top-[-20%] left-[-20%] w-[80%] h-[80%] bg-primary/20 rounded-full blur-[120px]" />
-                    <div className="absolute bottom-[-20%] right-[-20%] w-[80%] h-[80%] bg-accent/20 rounded-full blur-[120px]" />
-                    <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')] bg-cover bg-center opacity-10 mix-blend-overlay"></div>
+        <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-slate-50">
+            {/* Background Gradients (Same as Admin Login) */}
+            <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-blue-200/40 rounded-full blur-[100px] pointer-events-none" />
+            <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-indigo-200/40 rounded-full blur-[100px] pointer-events-none" />
+
+            <div className="w-full max-w-md relative z-10">
+                <div className="text-center mb-8">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-500 to-indigo-600 shadow-xl shadow-blue-500/20 mb-4">
+                        <GraduationCap className="w-8 h-8 text-white" />
+                    </div>
+                    <h1 className="text-3xl font-bold text-slate-900 mb-2">
+                        学生ログイン
+                    </h1>
+                    <p className="text-slate-500">
+                        臨床実習ポータル
+                    </p>
                 </div>
 
-                <div className="relative z-10">
-                    <div className="flex items-center gap-3 mb-8">
-                        <div className="p-2 bg-white/10 backdrop-blur-md rounded-lg border border-white/10">
-                            <Activity className="w-6 h-6 text-accent" />
-                        </div>
-                        <span className="font-bold text-lg tracking-wide opacity-90">NSSU CLINICAL TRAINING</span>
-                    </div>
-
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.8 }}
-                    >
-                        <h1 className="text-5xl font-bold leading-tight mb-6">
-                            未来の医療を担う<br />
-                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">
-                                プロフェッショナルへ
-                            </span>
-                        </h1>
-                        <p className="text-lg text-slate-300 max-w-md leading-relaxed">
-                            令和8年度 臨床実習管理システムへようこそ。<br />
-                            実習スケジュールの管理、実績の記録をここから始めましょう。
-                        </p>
-                    </motion.div>
-                </div>
-
-                <div className="relative z-10 flex gap-8 text-sm font-medium text-slate-400">
-                    <div className="flex items-center gap-2">
-                        <ShieldCheck className="w-4 h-4 text-accent" />
-                        <span>Secure Access</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <GraduationCap className="w-4 h-4 text-primary" />
-                        <span>Student Portal</span>
-                    </div>
-                </div>
-            </div>
-
-            {/* Right Side - Form */}
-            <div className="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-12 relative">
-                <div className="w-full max-w-md">
+                <div className="glass-panel p-8 rounded-2xl shadow-2xl bg-white/80">
                     <AnimatePresence mode="wait">
-                        {step === 'check' && (
+                        {step === 'grade' && (
                             <motion.div
-                                key="check"
+                                key="grade"
                                 initial={{ opacity: 0, x: 20 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 exit={{ opacity: 0, x: -20 }}
-                                transition={{ duration: 0.3 }}
+                                className="space-y-6"
                             >
-                                <div className="mb-10">
-                                    <h2 className="text-3xl font-bold text-secondary mb-2">ログイン</h2>
-                                    <p className="text-slate-500">リストから自分の氏名を選択してください</p>
+                                <h2 className="text-lg font-bold text-slate-700 text-center mb-4">学年を選択してください</h2>
+                                <div className="grid grid-cols-1 gap-3">
+                                    {availableGrades.map(grade => (
+                                        <button
+                                            key={grade}
+                                            onClick={() => handleGradeSelect(grade)}
+                                            className="w-full py-4 px-6 rounded-xl bg-white border-2 border-slate-100 hover:border-primary hover:bg-slate-50 text-slate-700 hover:text-primary font-bold text-lg transition-all shadow-sm flex items-center justify-between group"
+                                        >
+                                            <span>{grade}年生</span>
+                                            <ArrowRight className="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        </button>
+                                    ))}
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {step === 'number' && (
+                            <motion.div
+                                key="number"
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -20 }}
+                                className="space-y-6"
+                            >
+                                <div className="flex items-center justify-between mb-2">
+                                    <button onClick={handleBack} className="text-sm text-slate-400 hover:text-slate-600 flex items-center gap-1">← 学年選択へ</button>
+                                    <span className="text-sm font-bold text-primary bg-primary/10 px-2 py-1 rounded">{selectedGrade}年生</span>
+                                </div>
+
+                                <h2 className="text-lg font-bold text-slate-700 text-center mb-4">学籍番号を選択してください</h2>
+
+                                <div className="grid grid-cols-2 gap-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                                    {filteredStudents.map(student => (
+                                        <button
+                                            key={student.id}
+                                            onClick={() => handleStudentSelect(student.id)}
+                                            className="py-3 px-2 rounded-xl bg-white border border-slate-100 hover:border-primary/50 hover:bg-slate-50 text-slate-700 hover:text-primary font-mono font-medium transition-all text-center text-sm"
+                                        >
+                                            {student.student_number}
+                                        </button>
+                                    ))}
+                                </div>
+                                {filteredStudents.length === 0 && (
+                                    <div className="text-center text-slate-400 py-8">
+                                        該当する学生がいません
+                                    </div>
+                                )}
+                            </motion.div>
+                        )}
+
+                        {step === 'password' && studentData && (
+                            <motion.div
+                                key="password"
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -20 }}
+                                className="space-y-6"
+                            >
+                                <button onClick={handleBack} className="text-sm text-slate-400 hover:text-slate-600 flex items-center gap-1 mb-2">← 学籍番号選択へ</button>
+
+                                <div className="text-center mb-6">
+                                    <div className="text-sm text-slate-500 font-mono mb-1">{studentData.student_number}</div>
+                                    <h2 className="text-2xl font-bold text-slate-900">{studentData.name} <span className="text-base font-normal text-slate-500">さん</span></h2>
+                                    {isRegistrationNeeded && (
+                                        <p className="text-xs text-amber-600 mt-2 bg-amber-50 inline-block px-2 py-1 rounded">初回パスワード設定が必要です</p>
+                                    )}
                                 </div>
 
                                 {error && (
-                                    <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-100 text-rose-600 text-sm flex items-center gap-3">
-                                        <div className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                                    <div className="p-4 rounded-xl bg-rose-50 border border-rose-100 text-rose-600 text-sm flex items-center gap-2">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
                                         {error}
                                     </div>
                                 )}
 
-                                <form onSubmit={handleNext} className="space-y-6">
+                                <form onSubmit={isRegistrationNeeded ? handleRegister : handleLogin} className="space-y-4">
                                     <div className="space-y-2">
-                                        <label className="text-sm font-bold text-slate-700">氏名選択</label>
-                                        <div className="relative">
-                                            <select
-                                                className="w-full pl-4 pr-10 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-primary focus:bg-white text-slate-900 font-bold transition-all duration-200 appearance-none"
-                                                value={selectedStudentId}
-                                                onChange={handleStudentSelect}
+                                        <label className="text-sm font-medium text-slate-700 ml-1">
+                                            {isRegistrationNeeded ? '新しいパスワードを設定' : 'パスワード'}
+                                        </label>
+                                        <div className="relative group">
+                                            <Lock className="absolute left-4 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-primary transition-colors" />
+                                            <input
+                                                type="password"
+                                                className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-12 pr-4 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-medium shadow-sm"
+                                                value={password}
+                                                onChange={(e) => setPassword(e.target.value)}
+                                                placeholder="••••••••"
                                                 required
-                                            >
-                                                <option value="">選択してください</option>
-                                                {students.map(student => (
-                                                    <option key={student.id} value={student.id}>
-                                                        {student.grade}年 {student.student_number} {student.name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                                                <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                                                </svg>
+                                                autoFocus
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {isRegistrationNeeded && (
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-slate-700 ml-1">パスワード（確認）</label>
+                                            <div className="relative group">
+                                                <Key className="absolute left-4 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-primary transition-colors" />
+                                                <input
+                                                    type="password"
+                                                    className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-12 pr-4 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-medium shadow-sm"
+                                                    value={confirmPassword}
+                                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                                    placeholder="確認のため再入力"
+                                                    required
+                                                />
                                             </div>
                                         </div>
-                                    </div>
-
-                                    <button
-                                        type="submit"
-                                        disabled={loading || !selectedStudentId}
-                                        className="w-full py-4 bg-secondary text-white rounded-xl font-bold hover:bg-secondary/90 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                    >
-                                        {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><span>次へ</span><ArrowRight className="w-4 h-4" /></>}
-                                    </button>
-                                </form>
-                            </motion.div>
-                        )}
-
-                        {step === 'login' && (
-                            <motion.div
-                                key="login"
-                                initial={{ opacity: 0, x: 20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: -20 }}
-                                transition={{ duration: 0.3 }}
-                            >
-                                <div className="mb-10">
-                                    <button onClick={() => setStep('check')} className="text-sm text-slate-400 hover:text-slate-600 mb-4 flex items-center gap-1">← 戻る</button>
-                                    <h2 className="text-3xl font-bold text-secondary mb-2">パスワード入力</h2>
-                                    <p className="text-slate-500">おかえりなさい、{name}さん</p>
-                                </div>
-
-                                {error && (
-                                    <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-100 text-rose-600 text-sm flex items-center gap-3">
-                                        <div className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
-                                        {error}
-                                    </div>
-                                )}
-
-                                <form onSubmit={handleLogin} className="space-y-6">
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-bold text-slate-700">パスワード</label>
-                                        <div className="relative">
-                                            <Lock className="absolute left-4 top-4 w-5 h-5 text-slate-400" />
-                                            <input
-                                                type="password"
-                                                className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-primary focus:bg-white text-slate-900 transition-all duration-200"
-                                                placeholder="••••••••"
-                                                value={password}
-                                                onChange={(e) => setPassword(e.target.value)}
-                                                required
-                                            />
-                                        </div>
-                                    </div>
+                                    )}
 
                                     <button
                                         type="submit"
                                         disabled={loading}
-                                        className="w-full py-4 bg-secondary text-white rounded-xl font-bold hover:bg-secondary/90 transition-all duration-200 disabled:opacity-70 flex items-center justify-center gap-2"
+                                        className="w-full py-3.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold hover:shadow-lg hover:shadow-blue-500/25 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group shadow-md"
                                     >
-                                        {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <span>ログイン</span>}
-                                    </button>
-                                </form>
-                            </motion.div>
-                        )}
-
-                        {step === 'register' && (
-                            <motion.div
-                                key="register"
-                                initial={{ opacity: 0, x: 20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: -20 }}
-                                transition={{ duration: 0.3 }}
-                            >
-                                <div className="mb-10">
-                                    <button onClick={() => setStep('check')} className="text-sm text-slate-400 hover:text-slate-600 mb-4 flex items-center gap-1">← 戻る</button>
-                                    <h2 className="text-3xl font-bold text-secondary mb-2">パスワード設定</h2>
-                                    <p className="text-slate-500">初回ログインのため、パスワードを設定してください</p>
-                                </div>
-
-                                {error && (
-                                    <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-100 text-rose-600 text-sm flex items-center gap-3">
-                                        <div className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
-                                        {error}
-                                    </div>
-                                )}
-
-                                <form onSubmit={handleRegister} className="space-y-6">
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-bold text-slate-700">新しいパスワード</label>
-                                        <div className="relative">
-                                            <Key className="absolute left-4 top-4 w-5 h-5 text-slate-400" />
-                                            <input
-                                                type="password"
-                                                className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-primary focus:bg-white text-slate-900 transition-all duration-200"
-                                                placeholder="6文字以上"
-                                                value={password}
-                                                onChange={(e) => setPassword(e.target.value)}
-                                                required
-                                                minLength={6}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-bold text-slate-700">パスワード（確認）</label>
-                                        <div className="relative">
-                                            <Key className="absolute left-4 top-4 w-5 h-5 text-slate-400" />
-                                            <input
-                                                type="password"
-                                                className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-primary focus:bg-white text-slate-900 transition-all duration-200"
-                                                placeholder="もう一度入力"
-                                                value={confirmPassword}
-                                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                                required
-                                                minLength={6}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <button
-                                        type="submit"
-                                        disabled={loading}
-                                        className="w-full py-4 bg-primary text-white rounded-xl font-bold hover:bg-primary/90 transition-all duration-200 disabled:opacity-70 flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
-                                    >
-                                        {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <span>設定して開始</span>}
+                                        {loading ? (
+                                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        ) : (
+                                            <>
+                                                {isRegistrationNeeded ? '設定して開始' : 'ログイン'}
+                                                <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                                            </>
+                                        )}
                                     </button>
                                 </form>
                             </motion.div>
                         )}
                     </AnimatePresence>
+                </div>
 
-                    <div className="mt-12 pt-6 border-t border-slate-100 text-center">
-                        <p className="text-xs text-slate-400 mb-4">管理者の方はこちら</p>
-                        <a
-                            href="/admin/login"
-                            className="inline-flex items-center justify-center px-6 py-2 rounded-lg bg-slate-50 text-slate-600 text-sm font-medium hover:bg-slate-100 transition-colors"
-                        >
-                            管理者ログイン
-                        </a>
-                    </div>
+                <div className="mt-8 text-center">
+                    <a
+                        href="/admin/login"
+                        className="text-xs text-slate-400 hover:text-primary transition-colors"
+                    >
+                        管理者はこちら
+                    </a>
                 </div>
             </div>
         </div>

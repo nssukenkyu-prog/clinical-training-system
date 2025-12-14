@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { db } from '../../lib/firebase';
 import { collection, query, where, getDocs, getCountFromServer } from 'firebase/firestore';
-import { Users, Calendar, SquareCheck, Clock, ArrowRight, Activity, Download } from 'lucide-react';
+import { Users, Calendar, SquareCheck, Clock, ArrowRight, Activity, Download, Monitor } from 'lucide-react';
 import { clsx } from 'clsx';
 
 export default function AdminDashboard() {
@@ -390,6 +390,16 @@ export default function AdminDashboard() {
                                     <Users className="w-5 h-5" />
                                 </div>
                                 <span className="font-medium text-slate-700 group-hover:text-slate-900">学生を管理</span>
+                            </div>
+                            <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
+                        </Link>
+
+                        <Link to="/site-kiosk" target="_blank" className="bg-white border border-slate-200 w-full p-4 rounded-xl flex items-center justify-between group hover:bg-slate-50 hover:shadow-sm transition-all mt-4">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-lg bg-pink-50 text-pink-600 border border-pink-100">
+                                    <Monitor className="w-5 h-5" />
+                                </div>
+                                <span className="font-medium text-slate-700 group-hover:text-slate-900">出席キオスクを開く</span>
                             </div>
                             <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
                         </Link>
