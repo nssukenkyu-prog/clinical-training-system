@@ -500,7 +500,7 @@ export default function SlotReservation() {
                             animate={{ y: 0 }}
                             exit={{ y: "100%" }}
                             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                            className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl pointer-events-auto"
+                            className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl p-6 pb-32 sm:pb-6 shadow-2xl pointer-events-auto"
                         >
                             <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6 sm:hidden" />
 
