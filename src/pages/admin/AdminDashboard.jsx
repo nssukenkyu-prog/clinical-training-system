@@ -4,6 +4,7 @@ import { db } from '../../lib/firebase';
 import { collection, query, where, getDocs, getCountFromServer } from 'firebase/firestore';
 import { Users, Calendar, SquareCheck, Clock, ArrowRight, Activity, Download, Monitor } from 'lucide-react';
 import { clsx } from 'clsx';
+import { syncStudentDirectory } from '../../utils/syncDirectory';
 
 export default function AdminDashboard() {
     const [stats, setStats] = useState({
@@ -414,6 +415,27 @@ export default function AdminDashboard() {
                             </div>
                             <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
                         </Link>
+
+                        <button
+                            onClick={async () => {
+                                if (!window.confirm('学生ログイン用の公開ディレクトリを同期しますか？')) return;
+                                const res = await syncStudentDirectory();
+                                if (res.success) alert(`同期完了: ${res.count}件`);
+                                else alert('同期失敗');
+                            }}
+                            className="bg-white border border-slate-200 w-full p-4 rounded-xl flex items-center justify-between group hover:bg-slate-50 hover:shadow-sm transition-all text-left mt-3"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-lg bg-slate-50 text-slate-600 border border-slate-100">
+                                    <Activity className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <span className="font-medium text-slate-700 group-hover:text-slate-900 block">システム同期</span>
+                                    <span className="text-xs text-slate-400">ログイン用データを更新</span>
+                                </div>
+                            </div>
+                            <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
+                        </button>
                     </div>
                 </div>
             </div>
