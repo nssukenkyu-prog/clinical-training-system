@@ -80,8 +80,31 @@ export default function SlotReservation() {
     };
 
     const getSlotsForDate = (date) => {
-        const dateStr = date.toISOString().split('T')[0];
-        return slots.filter(s => s.date === dateStr).sort((a, b) => a.start_time.localeCompare(b.start_time));
+        if (!date) return [];
+        // Local Date String construction manually to avoid UTC issues
+        const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+        let availableSlots = slots.filter(slot => slot.date === dateStr);
+
+        // Filter: 12-Hour Advance Rule & Past Date Prevention
+        const now = new Date();
+        // Today string in YYYY-MM-DD
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+        // 1. Filter out past DATES immediately
+        if (dateStr < todayStr) return [];
+
+        // 2. If it is TODAY or FUTURE, check specific times against 12h rule
+        // Rule: Can only book if slot start time is more than 12 hours from now
+        const twelveHoursLater = new Date(now.getTime() + 12 * 60 * 60 * 1000);
+
+        availableSlots = availableSlots.filter(slot => {
+            // Construct Slot Date Object
+            const slotStartDateTime = new Date(`${slot.date}T${slot.start_time}`);
+            return slotStartDateTime > twelveHoursLater;
+        });
+
+        return availableSlots.sort((a, b) => a.start_time.localeCompare(b.start_time));
     };
 
     const isAlreadyReserved = (slot) => {

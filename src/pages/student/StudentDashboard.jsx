@@ -98,14 +98,18 @@ export default function StudentDashboard() {
     const getStatusLabel = (res) => {
         if (res.status === 'completed') return { label: '承認済', color: 'bg-emerald-50 text-emerald-600' };
         if (res.status === 'confirmed') {
-            const endDateTime = new Date(`${res.slot_date}T${res.custom_end_time || res.slot_end_time}`);
-            if (endDateTime < now) {
+            // Check if it is in the past
+            const now = new Date();
+            const slotDateTime = new Date(`${res.slot_date}T${res.slot_start_time || res.custom_start_time}`);
+
+            if (slotDateTime < now) {
                 return { label: '承認待ち', color: 'bg-amber-50 text-amber-600' };
             }
-            return { label: '予約中', color: 'bg-indigo-50 text-indigo-600' };
+            return { label: '予約済', color: 'bg-indigo-50 text-indigo-600' };
         }
         return { label: res.status, color: 'bg-slate-100 text-slate-500' };
     };
+
 
     return (
         <div className="space-y-6 pb-24">
@@ -220,8 +224,13 @@ export default function StudentDashboard() {
                                         className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-100 shadow-sm"
                                     >
                                         <div className="flex items-center gap-3">
-                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${status.label === '承認済' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
-                                                {status.label === '承認済' ? <CheckCircle2 className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${status.label === '承認済' ? 'bg-emerald-100 text-emerald-600' :
+                                                status.label === '承認待ち' ? 'bg-amber-100 text-amber-600' :
+                                                    'bg-indigo-100 text-indigo-600'
+                                                }`}>
+                                                {status.label === '承認済' ? <CheckCircle2 className="w-5 h-5" /> :
+                                                    status.label === '承認待ち' ? <Clock className="w-5 h-5" /> :
+                                                        <Calendar className="w-5 h-5" />}
                                             </div>
                                             <div>
                                                 <div className="font-bold text-slate-900 text-sm">{res.slot_date}</div>
