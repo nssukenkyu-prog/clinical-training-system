@@ -18,6 +18,11 @@ service cloud.firestore {
 
     // --- Collections ---
 
+    // 1. Public Directory: Admin clean-up allowed
+    match /public_student_directory/{studentId} {
+      allow read, write: if isAdmin();
+    }
+
     // 2. Students Private Data: Strictly controlled
     match /students/{studentId} {
       allow read, write: if isAdmin() || isStudentOwner(studentId);
