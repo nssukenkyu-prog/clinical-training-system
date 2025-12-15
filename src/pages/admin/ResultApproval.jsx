@@ -5,9 +5,9 @@ import { SquareCheck, Search, Check, X, Clock } from 'lucide-react';
 import { clsx } from 'clsx';
 
 // Helper function (module scope for use in ResultCard)
-const formatDate = (dateStr) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
+const formatDate = (dateInput) => {
+    if (!dateInput) return '';
+    const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
     const days = ['日', '月', '火', '水', '木', '金', '土'];
     return `${date.getMonth() + 1}月${date.getDate()}日(${days[date.getDay()]})`;
 };

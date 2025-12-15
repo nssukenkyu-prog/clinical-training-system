@@ -326,7 +326,10 @@ export default function SlotReservation() {
         }
     };
 
-    const formatDate = (date) => {
+    const formatDate = (dateInput) => {
+        if (!dateInput) return { day: '', weekday: '', full: '' };
+
+        const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
         const days = ['日', '月', '火', '水', '木', '金', '土'];
         return {
             day: date.getDate(),
