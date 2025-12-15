@@ -111,7 +111,17 @@ export default function StudentDashboard() {
     };
 
     const handleCancel = async (reservation) => {
-        if (!confirm('予約をキャンセルしてもよろしいですか？\n※直前のキャンセルは先生に連絡してください。')) return;
+        // 24-hour restriction check
+        const now = new Date();
+        const slotDateTime = new Date(`${reservation.slot_date}T${reservation.custom_start_time || reservation.slot_start_time}`);
+        const diffHours = (slotDateTime - now) / (1000 * 60 * 60);
+
+        if (diffHours < 24) {
+            alert('予約日時の24時間前を過ぎているためキャンセルできません。\n欠席する場合は教員に直接連絡してください。');
+            return;
+        }
+
+        if (!confirm('予約をキャンセルしてもよろしいですか？')) return;
 
         try {
             await updateDoc(doc(db, 'reservations', reservation.id), {
