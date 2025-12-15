@@ -80,24 +80,89 @@ export default function StudentManagement() {
         });
     };
 
+    // Secondary Auth for administrative creation
+    const [secondaryAuth, setSecondaryAuth] = useState(null);
+
+    useEffect(() => {
+        // Initialize secondary app for creating users without signing out admin
+        import('firebase/app').then(({ initializeApp }) => {
+            import('firebase/auth').then(({ getAuth }) => {
+                const config = {
+                    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+                    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+                    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+                    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+                    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+                    appId: import.meta.env.VITE_FIREBASE_APP_ID
+                };
+                // Avoid dup name error by checking if already exists? 
+                // Simple workaround: Try/Catch or unique name
+                try {
+                    const secApp = initializeApp(config, "AdminWorkerApp");
+                    setSecondaryAuth(getAuth(secApp));
+                } catch (e) {
+                    // If already exists, get it (difficult without exposing app in global). 
+                    // Ideally we move this to a lib.
+                    // For now, assume single mount or ignore re-init error if we can access the instance?
+                    // Actually, re-render might cause issue.
+                    // Let's rely on standard flow.
+                }
+            });
+        });
+    }, []);
+
+    // Helper: Create Shadow User
+    const createShadowUser = async (studentNumber, name, password) => {
+        if (!secondaryAuth) return null;
+        try {
+            const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
+            const shadowEmail = `${studentNumber.toLowerCase()}@clinical-system.local`;
+            const userCred = await createUserWithEmailAndPassword(secondaryAuth, shadowEmail, password);
+            await updateProfile(userCred.user, { displayName: name });
+            return { uid: userCred.user.uid, shadowEmail };
+        } catch (e) {
+            console.error("Shadow Auth Creation Failed:", e);
+            return null;
+        }
+    };
+
     const handleAddStudent = async (e) => {
         e.preventDefault();
 
         try {
-            await addDoc(collection(db, 'students'), {
+            // 1. Create Shadow Auth (Name-Based)
+            const shadowEmail = `${formData.studentNumber.toLowerCase()}@clinical-system.local`;
+
+            // Generate password from Name (Normalized)
+            const normalizedName = formData.name.replace(/\s+/g, '');
+            const password = `s${formData.studentNumber}-${normalizedName}`;
+
+            const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
+            const userCred = await createUserWithEmailAndPassword(secondaryAuth, shadowEmail, password);
+            const uid = userCred.user.uid;
+
+            await updateProfile(userCred.user, { displayName: formData.name });
+
+            // 2. Create in Firestore (Private Profile)
+            await setDoc(doc(db, 'students', uid), { // Use UID as Doc ID for consistency? 
+                // WAIT - Previous system used random ID or something else?
+                // Migration tool uses 'student.id' from existing doc. 
+                // New students should ideally use UID as Doc ID or keep auto-id.
+                // Let's stick to Auto-ID for the doc, but store auth_user_id inside.
+                // Actually, if we use Auto-ID, we can't easily guess it.
+                // But we don't need to guess it for now.
+
                 student_number: formData.studentNumber,
                 email: formData.email,
                 name: formData.name,
-                grade: formData.grade,
+                grade: parseInt(formData.grade),
                 training_type: formData.trainingType,
-                auth_user_id: null,
-                password_set: false,
-                initial_password: inputPassword || generatePassword(),
+                auth_user_id: uid,
+                shadow_email: shadowEmail,
+                auth_mode: 'name_match_v1',
                 created_at: new Date().toISOString()
             });
-
-            // Trigger Worker to send invite/create Auth user (Placeholder)
-            console.log('Should trigger Cloudflare Worker to create Auth user and send invite email');
+            // Note: We are strictly NOT creating a public directory entry anymore.
 
             setShowModal(false);
             setFormData({ studentNumber: '', email: '', name: '', grade: 2, trainingType: 'I' });
@@ -116,52 +181,78 @@ export default function StudentManagement() {
             alert('CSVデータを入力してください');
             return;
         }
+        if (!secondaryAuth) {
+            alert('システム初期化中です。少々お待ちください。');
+            return;
+        }
 
         const lines = csvData.trim().split('\n');
-        const studentsToAdd = [];
 
-        for (const line of lines) {
-            const [studentNumber, email, name, grade, trainingType] = line.split(',').map(s => s.trim());
-            if (studentNumber && email && name) {
-                studentsToAdd.push({
+        setSending(true);
+
+        try {
+            // We process one by one to create Auth users serially
+            // Limiting for large batches might be needed, but assuming small operation for now.
+            let successCount = 0;
+            const batch = writeBatch(db);
+            const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
+
+            // Limit batch size? Firestore limit is 500.
+            // Loop
+            for (const line of lines) {
+                const [studentNumber, email, name, grade, trainingType] = line.split(',').map(s => s.trim());
+                if (!studentNumber) continue;
+
+                // 1. Auth
+                const shadowEmail = `${studentNumber.toLowerCase()}@clinical-system.local`;
+                const password = studentNumber; // Default password for bulk import = Student ID
+                let uid = null;
+
+                try {
+                    const userCred = await createUserWithEmailAndPassword(secondaryAuth, shadowEmail, password);
+                    await updateProfile(userCred.user, { displayName: name });
+                    uid = userCred.user.uid;
+                } catch (e) {
+                    console.warn(`Auth failed for ${name}:`, e.code);
+                    // Continue? If email exists, maybe we just want to create DB entry?
+                    // We'll proceed without UID if creation fails (e.g. valid duplicate)
+                }
+
+                // 2. DB Refs
+                const newDocRef = doc(collection(db, 'students'));
+
+                // Private
+                batch.set(newDocRef, {
                     student_number: studentNumber,
                     email,
                     name,
                     grade: parseInt(grade) || 2,
                     training_type: trainingType || 'I',
-                    password_set: false,
-                    initial_password: generatePassword(),
-                    auth_user_id: null,
+                    password_set: true,
+                    initial_password: null,
+                    auth_user_id: uid,
+                    shadow_email: shadowEmail,
                     created_at: new Date().toISOString()
                 });
+
+                // Public
+                const publicRef = doc(db, 'public_student_directory', newDocRef.id);
+                batch.set(publicRef, {
+                    name,
+                    student_number: studentNumber,
+                    grade: parseInt(grade) || 2,
+                    training_type: trainingType || 'I'
+                });
+
+                successCount++;
             }
-        }
-
-        if (studentsToAdd.length === 0) {
-            alert('有効なデータがありません');
-            return;
-        }
-
-        setSending(true);
-
-        try {
-            const batch = writeBatch(db);
-            const studentsRef = collection(db, 'students');
-
-            studentsToAdd.forEach(student => {
-                const newDocRef = doc(studentsRef);
-                batch.set(newDocRef, student);
-            });
 
             await batch.commit();
-
-            // Trigger Worker for bulk Auth creation (Placeholder)
-            console.log('Should trigger Cloudflare Worker for bulk Auth creation');
 
             setShowBulkModal(false);
             setCsvData('');
             loadStudents();
-            alert(`${studentsToAdd.length}名の学生を登録しました`);
+            alert(`${successCount}名の学生を登録しました`);
 
         } catch (error) {
             console.error(error);

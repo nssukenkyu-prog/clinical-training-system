@@ -1,55 +1,71 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper function to check if user is admin
-    // Note: This assumes admin email is used as document ID or we query it. 
-    // Since we can't easily query in rules, we might rely on custom claims or just check if auth email is in admins collection.
-    // For simplicity here, we assume admin management is done securely.
-    // A better approach for admin check in rules without custom claims:
-    // exists(/databases/$(database)/documents/admins/$(request.auth.token.email)) 
-    // BUT email as ID is tricky if it has special chars. 
-    // Let's assume we use a known admin ID or just allow write if authenticated as specific email (hardcoded) or use a collection check if IDs are emails.
-    // In our app, we store admins with auto-IDs but query by email. This makes rules hard.
-    // Alternative: Store admins with email as ID (sanitized).
-    // For now, let's just allow write if request.auth.token.email matches a hardcoded list or if we can lookup.
-    // Since we can't easily lookup by property, we'll stick to basic auth checks for now and rely on app logic + maybe a special 'admin' flag in user metadata if we had it.
-    // For this migration, we will allow write if the user is authenticated and has an email that ends with a specific domain or is in a hardcoded list?
-    // No, let's try to use the 'admins' collection check if possible.
-    // If we can't, we'll just require auth for writes and rely on client app hiding admin routes (not secure but better than open).
-    // BETTER: Allow write to 'slots', 'settings' only if request.auth.token.email == 'admin@example.com' (or whatever the admin email is).
-    // Since I don't know the admin email, I will leave a TODO or use a placeholder.
-    
-    function isAuthenticated() {
-      return request.auth != null;
+
+    // Helper: Check if user is an Admin
+    function isAdmin() {
+      // Admin document must use UID as key (migrated)
+      // and checking existence is sufficient if we trust the admins collection is secure (it is write-protected)
+      return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
-    match /admins/{adminId} {
-      allow read: if isAuthenticated();
-      allow write: if false; // Only manual updates
+    // Helper: Check if user is the Owner of the student profile
+    // We fetch the student doc to verify 'auth_user_id' matches requester
+    function isStudentOwner(studentId) {
+       return request.auth != null && 
+              get(/databases/$(database)/documents/students/$(studentId)).data.auth_user_id == request.auth.uid;
     }
 
+    // --- Collections ---
+
+    // 2. Students Private Data: Strictly controlled
     match /students/{studentId} {
-      allow read: if true; // Needed for login/signup lookup
-      allow create: if isAuthenticated(); // Admin creates
-      allow update: if isAuthenticated(); // Admin or Student (password_set)
-      allow delete: if isAuthenticated(); // Admin
+      allow read, write: if isAdmin() || isStudentOwner(studentId);
+      allow create: if isAdmin();
     }
 
+    // 3. Admins: Secure self-access
+    match /admins/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if false; // Managed via backend/script only
+    }
+
+    // 4. Reservations: Protecting schedule privacy
+    match /reservations/{reservationId} {
+        // Admin can read/write all.
+        // Student can read/write their own (checked via student_id field -> student doc -> auth_user_id)
+        // Note: For Kiosk (Unauth), this block denies access. Kiosk MUST be Admin-authenticated for full checking.
+        
+        allow read, write: if isAdmin() || (
+            request.auth != null &&
+            get(/databases/$(database)/documents/students/$(resource.data.student_id)).data.auth_user_id == request.auth.uid
+        );
+        
+        // Allow create if authenticated and the new doc's student owner matches
+        allow create: if isAdmin() || (
+            request.auth != null &&
+            get(/databases/$(database)/documents/students/$(request.resource.data.student_id)).data.auth_user_id == request.auth.uid
+        );
+    }
+    
+    // 5. Slots: Public Read (Calendar), Admin Write
     match /slots/{slotId} {
       allow read: if true;
-      allow write: if isAuthenticated(); // Admin
+      allow write: if isAdmin();
     }
 
-    match /reservations/{reservationId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
-      allow delete: if isAuthenticated();
-    }
-
-    match /settings/{settingId} {
+    // 6. Settings: Public Read (Config), Admin Write
+    match /system_settings/{settingId} {
       allow read: if true;
-      allow write: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // 7. Attendance Logs: Kiosk writes here
+    match /attendance_logs/{logId} {
+      // Allow create by anyone (Kiosk requirement if unauthenticated)
+      // Rate limiting or validation should ideally happen via Functions, but for Rules:
+      allow create: if true; 
+      allow read, update, delete: if isAdmin();
     }
   }
 }

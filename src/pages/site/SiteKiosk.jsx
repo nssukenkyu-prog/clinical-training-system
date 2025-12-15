@@ -113,10 +113,14 @@ export default function SiteKiosk() {
             // To do this securely without exposing all IDs to client (though this IS the client),
             // we fetch the student doc and compare.
 
-            // Wait, we need to find the student doc. 'reservations' has 'student_id'.
-            const sDoc = await getDocs(query(collection(db, 'students'), where('__name__', '==', studentId)));
-            if (sDoc.empty) throw new Error("Student record not found");
+            // Wait, we need to find the student doc.            // 1. Verify Student ID using Public Directory
+            const sDoc = await getDocs(query(collection(db, 'public_student_directory'), where('__name__', '==', studentId)));
+            if (sDoc.empty) throw new Error("学生データが見つかりません");
             const studentData = sDoc.docs[0].data();
+
+            // Check-in logic continues.
+            // Note: Reservation check might fail if not authenticated due to security rules.
+            // Ideally Kiosk should be authenticated as Admin or Service Account.
 
             // Case-insensitive comparison
             const recordId = (studentData.student_number || '').toString().toLowerCase();

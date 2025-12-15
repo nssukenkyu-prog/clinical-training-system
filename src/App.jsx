@@ -16,6 +16,7 @@ import StudentManagement from './pages/admin/StudentManagement';
 import SystemSettings from './pages/admin/SystemSettings';
 import ResultApproval from './pages/admin/ResultApproval';
 import SiteKiosk from './pages/site/SiteKiosk';
+import MigrationPage from './pages/admin/MigrationPage';
 
 import './index.css';
 
@@ -113,6 +114,7 @@ function App() {
                 <Route path="slots" element={<SlotManagement />} />
                 <Route path="approvals" element={<ResultApproval />} />
                 <Route path="settings" element={<SystemSettings />} />
+                <Route path="migration" element={<MigrationPage />} />
                 <Route path="*" element={<Navigate to="dashboard" replace />} />
               </Routes>
             </Layout>
