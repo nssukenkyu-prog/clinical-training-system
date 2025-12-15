@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, updateDoc, doc } from 'firebase/firestore';
 import { Clock, Calendar, CheckCircle2, ChevronRight, Trophy, Activity, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -108,6 +108,25 @@ export default function StudentDashboard() {
             return { label: '予約済', color: 'bg-indigo-50 text-indigo-600' };
         }
         return { label: res.status, color: 'bg-slate-100 text-slate-500' };
+    };
+
+    const handleCancel = async (reservation) => {
+        if (!confirm('予約をキャンセルしてもよろしいですか？\n※直前のキャンセルは先生に連絡してください。')) return;
+
+        try {
+            await updateDoc(doc(db, 'reservations', reservation.id), {
+                status: 'cancelled',
+                cancelled_at: new Date().toISOString(),
+                cancelled_by: 'student'
+            });
+
+            // Remove from local state
+            setReservations(prev => prev.filter(r => r.id !== reservation.id));
+            alert('予約をキャンセルしました');
+        } catch (error) {
+            console.error("Cancel error:", error);
+            alert('エラーが発生しました');
+        }
     };
 
 
@@ -285,6 +304,16 @@ export default function StudentDashboard() {
                                     <Activity className="w-6 h-6 text-slate-400 group-hover:text-primary transition-colors" />
                                 </div>
                             </div>
+
+
+                            <div className="mt-4 pt-4 border-t border-slate-100 flex justify-end">
+                                <button
+                                    onClick={() => handleCancel(nextReservation)}
+                                    className="text-xs font-bold text-slate-400 hover:text-rose-500 transition-colors"
+                                >
+                                    予約をキャンセル
+                                </button>
+                            </div>
                         </div>
                     ) : (
                         <div className="bg-slate-50 rounded-2xl p-6 text-center border border-slate-100 border-dashed">
@@ -295,7 +324,7 @@ export default function StudentDashboard() {
                         </div>
                     )}
                 </motion.div>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 }
