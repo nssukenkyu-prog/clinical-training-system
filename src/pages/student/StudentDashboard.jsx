@@ -132,6 +132,69 @@ export default function StudentDashboard() {
 
             // Remove from local state
             setReservations(prev => prev.filter(r => r.id !== reservation.id));
+
+            // Email Notification
+            try {
+                const GAS_WEBHOOK_URL = import.meta.env.VITE_GAS_EMAIL_WEBHOOK_URL;
+                if (GAS_WEBHOOK_URL && student?.email) {
+                    // Simple date formatter for email
+                    const dateObj = new Date(reservation.slot_date);
+                    const dateStr = `${dateObj.getMonth() + 1}月${dateObj.getDate()}日`;
+
+                    await fetch(GAS_WEBHOOK_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        mode: 'no-cors',
+                        body: JSON.stringify({
+                            to: student.email,
+                            subject: '【臨床実習】予約キャンセル完了のお知らせ',
+                            body: `
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="color-scheme" content="light dark">
+<style>
+  body { font-family: sans-serif; line-height: 1.6; color: #1e293b; background-color: #f8fafc; }
+  .container { max-width: 600px; margin: 20px auto; padding: 20px; }
+  .card { background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; padding: 20px; }
+  .header { border-bottom: 2px solid #ef4444; padding-bottom: 10px; margin-bottom: 20px; }
+  .header h1 { color: #ef4444; margin: 0; font-size: 18px; }
+  .info-box { background-color: #fef2f2; border-radius: 8px; padding: 15px; margin: 15px 0; border: 1px solid #fee2e2; }
+  .label { font-size: 12px; color: #991b1b; font-weight: bold; }
+  .value { font-size: 14px; color: #7f1d1d; margin-top: 4px; }
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="header">
+        <h1>予約キャンセル完了</h1>
+      </div>
+      <div>
+        <p>${student.name} 様</p>
+        <p>以下の予約をキャンセルしました。</p>
+        <div class="info-box">
+          <div style="margin-bottom: 10px;">
+            <div class="label">日時</div>
+            <div class="value">${reservation.slot_date} (${dateStr}) <br> ${reservation.custom_start_time || reservation.slot_start_time} - ${reservation.custom_end_time || reservation.slot_end_time}</div>
+          </div>
+          <div>
+            <div class="label">実習区分</div>
+            <div class="value">臨床実習 ${reservation.slot_training_type}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`
+                        })
+                    });
+                }
+            } catch (e) {
+                console.error('Email failed', e);
+            }
+
             alert('予約をキャンセルしました');
         } catch (error) {
             console.error("Cancel error:", error);
