@@ -32,7 +32,8 @@ service cloud.firestore {
     // 3. Admins: Secure self-access
     match /admins/{userId} {
       allow read: if request.auth != null && request.auth.uid == userId;
-      allow write: if false; // Managed via backend/script only
+      // TEMPORARY: Allow write to self to fix data mismatch
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
 
     // 4. Reservations: Protecting schedule privacy
