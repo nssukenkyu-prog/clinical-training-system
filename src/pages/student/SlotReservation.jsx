@@ -14,8 +14,9 @@ export default function SlotReservation() {
     const [selectedSlot, setSelectedSlot] = useState(null);
     const [showTimeModal, setShowTimeModal] = useState(false);
     const [customStartTime, setCustomStartTime] = useState('');
-    const [customEndTime, setCustomEndTime] = useState('');
     const [reserving, setReserving] = useState(false);
+    const [reservationPriority, setReservationPriority] = useState(1);
+    const [existingReservations, setExistingReservations] = useState([]);
     const [settings, setSettings] = useState(null);
     const dateScrollRef = useRef(null);
 
@@ -24,7 +25,15 @@ export default function SlotReservation() {
             const studentId = sessionStorage.getItem('clinical_student_id');
             if (studentId) {
                 const studentDoc = await getDocs(query(collection(db, 'students'), where('__name__', '==', studentId)));
-                if (!studentDoc.empty) setStudent({ id: studentDoc.docs[0].id, ...studentDoc.docs[0].data() });
+                if (!studentDoc.empty) {
+                    const studentId = studentDoc.docs[0].id;
+                    setStudent({ id: studentId, ...studentDoc.docs[0].data() });
+
+                    // Initial fetch of existing reservations for priority check
+                    const resQuery = query(collection(db, 'reservations'), where('student_id', '==', studentId), where('status', 'in', ['applied', 'confirmed']));
+                    const resSnap = await getDocs(resQuery);
+                    setExistingReservations(resSnap.docs.map(d => d.data()));
+                }
             }
             const settingsDoc = await getDocs(collection(db, 'settings'));
             if (!settingsDoc.empty) setSettings(settingsDoc.docs[0].data());
@@ -198,7 +207,16 @@ export default function SlotReservation() {
         const initialEnd = validEnds.length > 0 ? validEnds[0] : slot.end_time;
         setCustomEndTime(initialEnd);
 
+        // Reset Priority default
+        setReservationPriority(1);
+
         setShowTimeModal(true);
+    };
+
+    const isPriorityTaken = (priority) => {
+        if (!settings?.lotteryMode) return false;
+        // Check if student already has an active reservation with this priority
+        return existingReservations.some(r => r.priority === priority && r.status !== 'cancelled');
     };
 
     const confirmReservation = async () => {
@@ -217,6 +235,15 @@ export default function SlotReservation() {
                 return;
             }
 
+            // Lottery Priority Check
+            if (isLottery) {
+                if (isPriorityTaken(reservationPriority)) {
+                    alert(`第${reservationPriority}希望は既に申し込まれています。`);
+                    setReserving(false);
+                    return;
+                }
+            }
+
             const reservationData = {
                 student_id: student.id,
                 slot_id: selectedSlot.id,
@@ -228,6 +255,7 @@ export default function SlotReservation() {
                 slot_training_type: selectedSlot.training_type,
                 custom_start_time: customStartTime,
                 custom_end_time: customEndTime,
+                priority: isLottery ? reservationPriority : null,
                 custom_duration_minutes: 0 // Calc logic here
             };
 
@@ -322,9 +350,16 @@ export default function SlotReservation() {
 
 
 
-            alert(isLottery ? '抽選申込が完了しました。\n結果をお待ちください。' : '予約が完了しました');
+            alert(isLottery ? `第${reservationPriority}希望として抽選に申し込みました。\n結果をお待ちください。` : '予約が完了しました');
             setShowTimeModal(false);
             setSelectedSlot(null);
+
+            // Reload existing reservations for next check
+            if (student) {
+                const resQuery = query(collection(db, 'reservations'), where('student_id', '==', student.id), where('status', 'in', ['applied', 'confirmed']));
+                const resSnap = await getDocs(resQuery);
+                setExistingReservations(resSnap.docs.map(d => d.data()));
+            }
         } catch (error) {
             console.error(error);
             alert('エラーが発生しました');
@@ -516,9 +551,37 @@ export default function SlotReservation() {
                         >
                             <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6 sm:hidden" />
 
-                            <h3 className="text-xl font-bold text-slate-900 mb-6">時間の調整</h3>
+                            <h3 className="text-xl font-bold text-slate-900 mb-6">{settings?.lotteryMode ? '抽選申込（希望順位選択）' : '時間の調整'}</h3>
 
                             <div className="space-y-4 mb-8">
+                                {settings?.lotteryMode && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">希望順位</label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {[1, 2, 3].map(p => {
+                                                const taken = isPriorityTaken(p);
+                                                return (
+                                                    <button
+                                                        key={p}
+                                                        onClick={() => !taken && setReservationPriority(p)}
+                                                        disabled={taken}
+                                                        className={clsx(
+                                                            "py-3 rounded-xl border-2 font-bold transition-all",
+                                                            taken ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed" :
+                                                                reservationPriority === p
+                                                                    ? "bg-amber-50 border-amber-500 text-amber-700"
+                                                                    : "bg-white border-slate-200 text-slate-600 hover:border-amber-300"
+                                                        )}
+                                                    >
+                                                        第{p}希望
+                                                        {taken && <span className="block text-[10px] font-normal">申込済</span>}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">開始時間</label>
                                     <select
@@ -572,6 +635,11 @@ export default function SlotReservation() {
                                     {reserving ? '処理中...' : (settings?.lotteryMode ? '申し込む' : '確定する')}
                                 </button>
                             </div>
+                            {settings?.lotteryMode && (
+                                <p className="text-center text-xs text-slate-400 mt-4">
+                                    ※第1〜第3希望まで、最大3枠申し込むことができます。
+                                </p>
+                            )}
                         </motion.div>
                     </div>
                 )}

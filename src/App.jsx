@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { useState, useEffect } from 'react';
 import { auth, db } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import Layout from './components/Layout';
 
 // Pages
@@ -36,12 +36,11 @@ function App() {
 
     try {
       // 1. Check Admin
-      const adminsRef = collection(db, 'admins');
-      const qAdmin = query(adminsRef, where('email', '==', currentUser.email));
-      const adminSnap = await getDocs(qAdmin);
-      if (!adminSnap.empty) {
+      const adminDocRef = doc(db, 'admins', currentUser.uid);
+      const adminSnap = await getDoc(adminDocRef);
+      if (adminSnap.exists()) {
         setUserRole('admin');
-        setUserName(adminSnap.docs[0].data().name || 'Admin');
+        setUserName(adminSnap.data().name || 'Admin');
         return;
       }
 

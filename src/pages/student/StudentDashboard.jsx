@@ -92,7 +92,10 @@ export default function StudentDashboard() {
 
     // Upcoming Reservation
     const now = new Date();
-    const upcomingReservations = reservations.filter(r => r.status === 'confirmed' && new Date(`${r.slot_date}T${r.slot_start_time || '00:00'}`) > now);
+    const upcomingReservations = reservations.filter(r =>
+        (r.status === 'confirmed' || r.status === 'applied') &&
+        new Date(`${r.slot_date}T${r.slot_start_time || '00:00'}`) > now
+    );
     const nextReservation = upcomingReservations.length > 0 ? upcomingReservations[upcomingReservations.length - 1] : null;
 
     const getStatusLabel = (res) => {
@@ -106,6 +109,9 @@ export default function StudentDashboard() {
                 return { label: '承認待ち', color: 'bg-amber-50 text-amber-600' };
             }
             return { label: '予約済', color: 'bg-indigo-50 text-indigo-600' };
+        }
+        if (res.status === 'applied') {
+            return { label: '抽選待ち', color: 'bg-orange-50 text-orange-600' };
         }
         return { label: res.status, color: 'bg-slate-100 text-slate-500' };
     };
@@ -339,6 +345,11 @@ export default function StudentDashboard() {
                                         <span className={`inline-block px-2.5 py-1 rounded-lg text-xs font-bold ${status.color}`}>
                                             {status.label}
                                         </span>
+                                        {res.priority && (
+                                            <span className="ml-2 inline-block px-1.5 py-1 rounded border border-orange-200 bg-orange-50 text-orange-700 text-[10px] font-bold">
+                                                第{res.priority}希望
+                                            </span>
+                                        )}
                                     </motion.div>
                                 );
                             })
@@ -372,6 +383,11 @@ export default function StudentDashboard() {
                                         <Clock className="w-4 h-4" />
                                         {nextReservation.custom_start_time.slice(0, 5)} - {nextReservation.custom_end_time.slice(0, 5)}
                                     </div>
+                                    {nextReservation.priority && (
+                                        <div className="mt-2 inline-block px-2 py-0.5 rounded border border-orange-200 bg-orange-50 text-orange-700 text-xs font-bold">
+                                            第{nextReservation.priority}希望で申込中
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center">
                                     <Activity className="w-6 h-6 text-slate-400 group-hover:text-primary transition-colors" />

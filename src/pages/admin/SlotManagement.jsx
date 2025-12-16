@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, query, where, getDocs, addDoc, deleteDoc, doc, writeBatch, updateDoc } from 'firebase/firestore';
-import { ChevronLeft, ChevronRight, Plus, Trash2, Calendar, Clock, Users, X, List, Grid, Info, UserCheck, AlertCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Trash2, Calendar, Clock, Users, X, List, Grid, Info, UserCheck, AlertCircle, Wand2 } from 'lucide-react';
 import { clsx } from 'clsx';
 
 export default function SlotManagement() {
@@ -220,15 +220,194 @@ export default function SlotManagement() {
         if (!window.confirm(`${studentName}の予約を削除しますか？`)) return;
         try {
             await deleteDoc(doc(db, 'reservations', reservationId));
-            // Reload to update UI
             loadSlots();
-            // Close detail modal if open, or update its content? 
-            // Better to reload and let user click again or update local state.
-            // For simplicity, reload slots.
             setSelectedSlot(null);
         } catch (error) {
             console.error(error);
             alert('予約削除に失敗しました');
+        }
+    };
+
+    const handleApproveReservation = async (reservationId, studentName) => {
+        if (!window.confirm(`${studentName}の予約を確定しますか？`)) return;
+        try {
+            await updateDoc(doc(db, 'reservations', reservationId), {
+                status: 'confirmed'
+            });
+            loadSlots();
+            setSelectedSlot(null);
+        } catch (error) {
+            console.error(error);
+            alert('予約確定に失敗しました');
+        }
+    };
+
+    const handleRunLottery = async () => {
+        if (!window.confirm('抽選割り当てを実行しますか？\n現在「抽選待ち」の全ての予約に対して、\n希望順位と定員(5名)に基づき自動割り当てを行います。')) return;
+        setLoading(true);
+
+        try {
+            // 1. Fetch ALL 'applied' reservations
+            const q = query(collection(db, 'reservations'), where('status', '==', 'applied'));
+            const snap = await getDocs(q);
+            const applications = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+            if (applications.length === 0) {
+                alert('抽選待ちの予約はありません');
+                setLoading(false);
+                return;
+            }
+
+            // 2. Fetch current slot usage (confirmed only) to respect existing approvals
+            // Ideally we re-fetch everything to be safe
+            // For simplicity, we assume we want to process purely based on inputs.
+            // But getting current counts is safer.
+            const slotsRef = collection(db, 'slots');
+            const slotsSnap = await getDocs(slotsRef);
+            const slotsMap = {}; // slotId -> { capacity, confirmedCount }
+            slotsSnap.forEach(d => {
+                const data = d.data();
+                slotsMap[d.id] = {
+                    max: data.max_capacity || 5,
+                    current: 0
+                };
+            });
+
+            // Get existing confirmed reservations to count current usage
+            // (Note: This might be heavy if db is huge, but initial system scale is okay)
+            const confirmedQ = query(collection(db, 'reservations'), where('status', '==', 'confirmed'));
+            const confirmedSnap = await getDocs(confirmedQ);
+            confirmedSnap.forEach(d => {
+                const data = d.data();
+                if (slotsMap[data.slot_id]) {
+                    slotsMap[data.slot_id].current += 1;
+                }
+            });
+
+            const updates = []; // Array of { id, status }
+            const winners = new Set(); // student_ids who won
+
+            // Helper to shuffle array
+            const shuffle = (array) => {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+                return array;
+            };
+
+            // Round 1: Priority 1
+            const priority1Apps = applications.filter(a => a.priority === 1);
+            // Group by Slot
+            const p1BySlot = {};
+            priority1Apps.forEach(app => {
+                if (!p1BySlot[app.slot_id]) p1BySlot[app.slot_id] = [];
+                p1BySlot[app.slot_id].push(app);
+            });
+
+            // Process P1
+            Object.keys(p1BySlot).forEach(slotId => {
+                const apps = p1BySlot[slotId];
+                const slotInfo = slotsMap[slotId] || { max: 5, current: 0 };
+                const remaining = Math.max(0, slotInfo.max - slotInfo.current);
+
+                if (apps.length <= remaining) {
+                    // All win
+                    apps.forEach(app => {
+                        updates.push({ id: app.id, status: 'confirmed' });
+                        winners.add(app.student_id);
+                        slotsMap[slotId].current += 1;
+                    });
+                } else {
+                    // Lottery
+                    const shuffled = shuffle([...apps]);
+                    const lucky = shuffled.slice(0, remaining);
+                    // The rest are unlucky (remain 'applied' for now, but ineffective)
+
+                    lucky.forEach(app => {
+                        updates.push({ id: app.id, status: 'confirmed' });
+                        winners.add(app.student_id);
+                        slotsMap[slotId].current += 1;
+                    });
+                }
+            });
+
+            // Round 2: Priority 2 (Only if not winner yet)
+            const priority2Apps = applications.filter(a => a.priority === 2 && !winners.has(a.student_id));
+            const p2BySlot = {};
+            priority2Apps.forEach(app => {
+                if (!p2BySlot[app.slot_id]) p2BySlot[app.slot_id] = [];
+                p2BySlot[app.slot_id].push(app);
+            });
+
+            Object.keys(p2BySlot).forEach(slotId => {
+                const apps = p2BySlot[slotId];
+                const slotInfo = slotsMap[slotId] || { max: 5, current: 0 };
+                const remaining = Math.max(0, slotInfo.max - slotInfo.current);
+
+                if (apps.length <= remaining) {
+                    apps.forEach(app => {
+                        updates.push({ id: app.id, status: 'confirmed' });
+                        winners.add(app.student_id);
+                        slotsMap[slotId].current += 1;
+                    });
+                } else {
+                    const shuffled = shuffle([...apps]);
+                    const lucky = shuffled.slice(0, remaining);
+                    lucky.forEach(app => {
+                        updates.push({ id: app.id, status: 'confirmed' });
+                        winners.add(app.student_id);
+                        slotsMap[slotId].current += 1;
+                    });
+                }
+            });
+
+            // Round 3: Priority 3 (Only if not winner yet)
+            const priority3Apps = applications.filter(a => a.priority === 3 && !winners.has(a.student_id));
+            const p3BySlot = {};
+            priority3Apps.forEach(app => {
+                if (!p3BySlot[app.slot_id]) p3BySlot[app.slot_id] = [];
+                p3BySlot[app.slot_id].push(app);
+            });
+
+            Object.keys(p3BySlot).forEach(slotId => {
+                const apps = p3BySlot[slotId];
+                const slotInfo = slotsMap[slotId] || { max: 5, current: 0 };
+                const remaining = Math.max(0, slotInfo.max - slotInfo.current);
+
+                if (apps.length <= remaining) {
+                    apps.forEach(app => {
+                        updates.push({ id: app.id, status: 'confirmed' });
+                        winners.add(app.student_id);
+                        slotsMap[slotId].current += 1;
+                    });
+                } else {
+                    const shuffled = shuffle([...apps]);
+                    const lucky = shuffled.slice(0, remaining);
+                    lucky.forEach(app => {
+                        updates.push({ id: app.id, status: 'confirmed' });
+                        winners.add(app.student_id);
+                        slotsMap[slotId].current += 1;
+                    });
+                }
+            });
+
+            // Commit Batch
+            // Firestore batch limit is 500. If updates > 500, need chunks. Initial scale likely ok.
+            const batch = writeBatch(db);
+            updates.forEach(u => {
+                batch.update(doc(db, 'reservations', u.id), { status: u.status });
+            });
+            await batch.commit();
+
+            alert(`自動割り当てが完了しました。\n当選者数: ${updates.length}名`);
+            loadSlots(); // Reload UI
+
+        } catch (e) {
+            console.error(e);
+            alert('自動割り当て中にエラーが発生しました');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -251,6 +430,7 @@ export default function SlotManagement() {
         switch (status) {
             case 'confirmed': return { label: '予約済', color: 'bg-yellow-100 text-yellow-700 border-yellow-200' };
             case 'completed': return { label: '完了', color: 'bg-green-100 text-green-700 border-green-200' };
+            case 'applied': return { label: '抽選待ち', color: 'bg-orange-100 text-orange-700 border-orange-200' };
             default: return { label: status, color: 'bg-slate-100 text-slate-600 border-slate-200' };
         }
     };
@@ -290,6 +470,9 @@ export default function SlotManagement() {
                     <p className="text-slate-500 mt-1">実習枠の作成・編集・削除を行います</p>
                 </div>
                 <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
+                    <button onClick={handleRunLottery} className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-transparent mr-2 transition-colors" title="自動抽選実行">
+                        <Wand2 className="w-4 h-4" /> 自動抽選
+                    </button>
                     <button onClick={() => setViewMode('month')} className={clsx("flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors", viewMode === 'month' ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700")}>
                         <Grid className="w-4 h-4" /> 月表示
                     </button>
@@ -511,17 +694,33 @@ export default function SlotManagement() {
                                                         {r.is_first_day && (
                                                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200 font-bold">初日</span>
                                                         )}
+                                                        {r.priority && (
+                                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 border border-orange-200 font-bold">
+                                                                第{r.priority}希望
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     <div className="text-xs text-slate-500 font-mono mt-0.5">{r.student_number}</div>
                                                 </div>
                                             </div>
-                                            <button
-                                                onClick={() => handleCancelReservation(r.id, r.student_name)}
-                                                className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
-                                                title="予約を解除"
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
+                                            <div className="flex items-center gap-1">
+                                                {r.status === 'applied' && (
+                                                    <button
+                                                        onClick={() => handleApproveReservation(r.id, r.student_name)}
+                                                        className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors"
+                                                        title="予約を確定（承認）"
+                                                    >
+                                                        <Check className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => handleCancelReservation(r.id, r.student_name)}
+                                                    className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                                                    title={r.status === 'applied' ? "申込を拒否（削除）" : "予約を解除"}
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </button>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>

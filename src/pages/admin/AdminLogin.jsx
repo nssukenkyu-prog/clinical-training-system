@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { auth, db } from '../../lib/firebase';
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, doc, getDoc } from 'firebase/firestore';
 import { Lock, Mail, ChevronRight, AlertCircle, ShieldCheck } from 'lucide-react';
 
 export default function AdminLogin() {
@@ -24,11 +24,10 @@ export default function AdminLogin() {
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
 
-            const adminsRef = collection(db, 'admins');
-            const q = query(adminsRef, where('email', '==', user.email));
-            const querySnapshot = await getDocs(q);
+            const adminDocRef = doc(db, 'admins', user.uid);
+            const adminSnap = await getDoc(adminDocRef);
 
-            if (querySnapshot.empty) {
+            if (!adminSnap.exists()) {
                 await signOut(auth);
                 setError('管理者権限がありません');
                 return;
