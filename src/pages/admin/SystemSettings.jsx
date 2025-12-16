@@ -9,7 +9,8 @@ export default function SystemSettings() {
         minDailyMinutes: 120,
         maxDailyMinutes: 480,
         cancellationDeadlineHours: 12,
-        maxStudentsPerSlot: 5
+        maxStudentsPerSlot: 5,
+        lotteryMode: false
     });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -209,18 +210,46 @@ export default function SystemSettings() {
                         </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Help Section */}
-            <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 flex items-start gap-3 shadow-sm">
-                <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-blue-600" />
-                <div>
-                    <strong className="block mb-1 font-semibold">設定の反映について</strong>
-                    <ul className="text-sm opacity-90 list-disc list-inside space-y-1 text-blue-700">
-                        <li>必要累積時間: 全学生の進捗計算に即座に反映されます。</li>
-                        <li>1日の最低/最高時間: 実績入力時のバリデーションに使用されます。</li>
-                        <li>キャンセル締切: 学生の予約確認画面に表示され、キャンセルボタンの制御に使用されます。</li>
-                    </ul>
+                {/* Lottery Mode Settings */}
+                <div className="glass-panel p-8 rounded-2xl bg-white shadow-lg border-slate-100">
+                    <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-slate-900">
+                        <AlertTriangle className="w-5 h-5 text-indigo-500" />
+                        抽選モード設定
+                    </h2>
+
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <span className="block text-base font-bold text-slate-900">抽選モードを有効にする</span>
+                            <span className="text-sm text-slate-500">有効にすると、学生は「予約」ではなく「抽選申込」のみが可能になります。重複チェックは緩和されます。</span>
+                            {settings.lotteryMode && (
+                                <p className="mt-2 text-xs font-bold text-indigo-600 bg-indigo-50 inline-block px-2 py-1 rounded">
+                                    現在、抽選受付中フェーズです
+                                </p>
+                            )}
+                        </div>
+                        <button
+                            onClick={() => setSettings({ ...settings, lotteryMode: !settings.lotteryMode })}
+                            className={`relative w-14 h-8 rounded-full transition-colors ${settings.lotteryMode ? 'bg-indigo-500' : 'bg-slate-200'}`}
+                        >
+                            <span
+                                className={`absolute top-1 left-1 w-6 h-6 rounded-full bg-white transition-transform transform ${settings.lotteryMode ? 'translate-x-6' : 'translate-x-0'}`}
+                            />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Help Section */}
+                <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 flex items-start gap-3 shadow-sm">
+                    <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-blue-600" />
+                    <div>
+                        <strong className="block mb-1 font-semibold">設定の反映について</strong>
+                        <ul className="text-sm opacity-90 list-disc list-inside space-y-1 text-blue-700">
+                            <li>必要累積時間: 全学生の進捗計算に即座に反映されます。</li>
+                            <li>1日の最低/最高時間: 実績入力時のバリデーションに使用されます。</li>
+                            <li>キャンセル締切: 学生の予約確認画面に表示され、キャンセルボタンの制御に使用されます。</li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>

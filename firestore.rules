@@ -60,7 +60,7 @@ service cloud.firestore {
     }
 
     // 6. Settings: Public Read (Config), Admin Write
-    match /system_settings/{settingId} {
+    match /settings/{settingId} {
       allow read: if true;
       allow write: if isAdmin();
     }

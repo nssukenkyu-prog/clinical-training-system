@@ -206,8 +206,12 @@ export default function SlotReservation() {
         setReserving(true);
 
         try {
-            // Strict Simultaneous Capacity Check
-            if (!checkSimultaneousCapacity(selectedSlot, customStartTime, customEndTime)) {
+            // Determine reservation status based on Lottery Mode
+            const isLottery = settings?.lotteryMode;
+            const newStatus = isLottery ? 'applied' : 'confirmed';
+
+            // Strict Simultaneous Capacity Check (Skip if Lottery Mode)
+            if (!isLottery && !checkSimultaneousCapacity(selectedSlot, customStartTime, customEndTime)) {
                 alert('指定された時間は定員(5名)に達しているため予約できません。\n時間をずらして再度お試しください。');
                 setReserving(false);
                 return;
@@ -216,7 +220,7 @@ export default function SlotReservation() {
             const reservationData = {
                 student_id: student.id,
                 slot_id: selectedSlot.id,
-                status: 'confirmed',
+                status: newStatus,
                 created_at: new Date().toISOString(),
                 slot_date: selectedSlot.date,
                 slot_start_time: selectedSlot.start_time,
@@ -240,7 +244,8 @@ export default function SlotReservation() {
                         mode: 'no-cors',
                         body: JSON.stringify({
                             to: student.email,
-                            subject: '【臨床実習】実習予約のお知らせ',
+                            to: student.email,
+                            subject: isLottery ? '【臨床実習】実習抽選申込のお知らせ' : '【臨床実習】実習予約のお知らせ',
                             body: `
 <!DOCTYPE html>
 <html>
@@ -276,12 +281,12 @@ export default function SlotReservation() {
 <body>
   <div class="container">
     <div class="card">
-      <div class="header">
-        <h1>実習予約完了</h1>
+      <div class="header" style="${isLottery ? 'background-color: #f59e0b;' : ''}">
+        <h1>${isLottery ? '抽選申込完了' : '実習予約完了'}</h1>
       </div>
       <div class="content">
         <h2>${student.name} 様</h2>
-        <p>以下の内容で実習予約を受け付けました。</p>
+        <p>${isLottery ? '以下の内容で抽選への申込を受け付けました。<br><strong>※まだ確定ではありません。後日結果をご連絡します。</strong>' : '以下の内容で実習予約を受け付けました。'}</p>
         
         <div class="info-box">
           <div class="info-row">
@@ -315,7 +320,9 @@ export default function SlotReservation() {
                 // Do not block UI success even if email fails
             }
 
-            alert('予約が完了しました');
+
+
+            alert(isLottery ? '抽選申込が完了しました。\n結果をお待ちください。' : '予約が完了しました');
             setShowTimeModal(false);
             setSelectedSlot(null);
         } catch (error) {
@@ -467,9 +474,14 @@ export default function SlotReservation() {
                                         ) : availability.remaining > 0 ? (
                                             <button
                                                 onClick={() => handleReserve(slot)}
-                                                className="w-full py-3 rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/20"
+                                                className={clsx(
+                                                    "w-full py-3 rounded-xl font-bold text-sm transition-colors shadow-lg",
+                                                    settings?.lotteryMode
+                                                        ? "bg-amber-500 text-white hover:bg-amber-600 shadow-amber-500/20"
+                                                        : "bg-slate-900 text-white hover:bg-slate-800 shadow-slate-900/20"
+                                                )}
                                             >
-                                                予約する
+                                                {settings?.lotteryMode ? '抽選に申し込む' : '予約する'}
                                             </button>
                                         ) : (
                                             <button disabled className="w-full py-3 rounded-xl bg-slate-100 text-slate-400 font-bold text-sm cursor-not-allowed">
@@ -557,7 +569,7 @@ export default function SlotReservation() {
                                     disabled={reserving || !customStartTime || !customEndTime}
                                     className="flex-1 py-3.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/30 disabled:opacity-70 disabled:cursor-not-allowed"
                                 >
-                                    {reserving ? '処理中...' : '確定する'}
+                                    {reserving ? '処理中...' : (settings?.lotteryMode ? '申し込む' : '確定する')}
                                 </button>
                             </div>
                         </motion.div>
