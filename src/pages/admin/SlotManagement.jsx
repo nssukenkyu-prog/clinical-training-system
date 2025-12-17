@@ -395,12 +395,27 @@ export default function SlotManagement() {
             // Commit Batch
             // Firestore batch limit is 500. If updates > 500, need chunks. Initial scale likely ok.
             const batch = writeBatch(db);
+
+            // 1. Updates for winners
             updates.forEach(u => {
                 batch.update(doc(db, 'reservations', u.id), { status: u.status });
             });
+
+            // 2. Cleanup for winners (Delete other applications)
+            const winningReservationIds = new Set(updates.map(u => u.id));
+            let deletedCount = 0;
+
+            applications.forEach(app => {
+                // If student won SOMETHING, but this specific app is NOT the winner
+                if (winners.has(app.student_id) && !winningReservationIds.has(app.id)) {
+                    batch.delete(doc(db, 'reservations', app.id));
+                    deletedCount++;
+                }
+            });
+
             await batch.commit();
 
-            alert(`自動割り当てが完了しました。\n当選者数: ${updates.length}名`);
+            alert(`自動割り当てが完了しました。\n当選: ${updates.length}件\n自動削除(重複申込): ${deletedCount}件`);
             loadSlots(); // Reload UI
 
         } catch (e) {
