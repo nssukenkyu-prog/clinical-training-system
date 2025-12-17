@@ -130,12 +130,13 @@ export default function StudentManagement() {
         e.preventDefault();
 
         try {
-            // 1. Create Shadow Auth (ID-Based)
+            // 1. Create Shadow Auth (Name-Based)
             const shadowEmail = `${formData.studentNumber.toLowerCase()}@clinical-system.local`;
 
-            // FIX: Use ID-based password to avoid Name ambiguity
-            // Format: s{ID}-{ID}
-            const password = `s${formData.studentNumber.toLowerCase()}-${formData.studentNumber.toLowerCase()}`;
+            // Generate password from Name (Normalized)
+            const normalizedName = formData.name.replace(/\s+/g, '');
+            // Default Pw Format: s{studentNumber}-{Name(NoSpaces)}
+            const password = `s${formData.studentNumber.toLowerCase()}-${normalizedName}`;
 
             const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
             const userCred = await createUserWithEmailAndPassword(secondaryAuth, shadowEmail, password);
@@ -207,10 +208,11 @@ export default function StudentManagement() {
                 const [studentNumber, email, name, grade, trainingType] = line.split(',').map(s => s.trim());
                 if (!studentNumber) continue;
 
-                // 1. Auth (ID-Based)
+                // 1. Auth (Name-Based)
                 const shadowEmail = `${studentNumber.toLowerCase()}@clinical-system.local`;
-                // FIX: Use ID-based password for consistency
-                const password = `s${studentNumber.toLowerCase()}-${studentNumber.toLowerCase()}`;
+                // Generate Pw
+                const normalizedName = name.replace(/\s+/g, '');
+                const password = `s${studentNumber.toLowerCase()}-${normalizedName}`;
                 let uid = null;
 
                 try {
@@ -593,7 +595,7 @@ export default function StudentManagement() {
                                                         {visiblePasswords.has(student.id) ? (
                                                             student.current_password_plaintext ||
                                                             student.initial_password ||
-                                                            `s${student.student_number.toLowerCase()}-${student.student_number.toLowerCase()}`
+                                                            `s${student.student_number.toLowerCase()}-${student.name.replace(/\s+/g, '')}`
                                                         ) : '••••••••'}
                                                     </span>
                                                     <button
