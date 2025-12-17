@@ -174,7 +174,11 @@ export default function StudentManagement() {
 
         } catch (error) {
             console.error(error);
-            alert('学生登録に失敗しました');
+            if (error.code === 'auth/email-already-in-use') {
+                alert(`学籍番号 ${formData.studentNumber} は既に登録されています。\n一覧に表示されていない場合は、システム管理者に連絡してください（Authデータ残存の可能性があります）。`);
+            } else {
+                alert('学生登録に失敗しました: ' + error.message);
+            }
         }
     };
 
