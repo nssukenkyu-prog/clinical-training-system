@@ -277,11 +277,15 @@ export default function SlotManagement() {
             // (Note: This might be heavy if db is huge, but initial system scale is okay)
             const confirmedQ = query(collection(db, 'reservations'), where('status', '==', 'confirmed'));
             const confirmedSnap = await getDocs(confirmedQ);
+
+            const confirmedStudentIds = new Set(); // Track students who already have confirmed slots
+
             confirmedSnap.forEach(d => {
                 const data = d.data();
                 if (slotsMap[data.slot_id]) {
                     slotsMap[data.slot_id].current += 1;
                 }
+                confirmedStudentIds.add(data.student_id);
             });
 
             const updates = []; // Array of { id, status }
@@ -297,7 +301,9 @@ export default function SlotManagement() {
             };
 
             // Round 1: Priority 1
-            const priority1Apps = applications.filter(a => a.priority === 1);
+            const priority1Apps = applications.filter(a => a.priority === 1 && !confirmedStudentIds.has(a.student_id));
+            // Note: We also prevent already confirmed students from winning again (double booking prevention)
+
             // Group by Slot
             const p1BySlot = {};
             priority1Apps.forEach(app => {
@@ -332,8 +338,8 @@ export default function SlotManagement() {
                 }
             });
 
-            // Round 2: Priority 2 (Only if not winner yet)
-            const priority2Apps = applications.filter(a => a.priority === 2 && !winners.has(a.student_id));
+            // Round 2: Priority 2 (Only if not winner yet AND not already confirmed)
+            const priority2Apps = applications.filter(a => a.priority === 2 && !winners.has(a.student_id) && !confirmedStudentIds.has(a.student_id));
             const p2BySlot = {};
             priority2Apps.forEach(app => {
                 if (!p2BySlot[app.slot_id]) p2BySlot[app.slot_id] = [];
@@ -362,8 +368,8 @@ export default function SlotManagement() {
                 }
             });
 
-            // Round 3: Priority 3 (Only if not winner yet)
-            const priority3Apps = applications.filter(a => a.priority === 3 && !winners.has(a.student_id));
+            // Round 3: Priority 3 (Only if not winner yet AND not already confirmed)
+            const priority3Apps = applications.filter(a => a.priority === 3 && !winners.has(a.student_id) && !confirmedStudentIds.has(a.student_id));
             const p3BySlot = {};
             priority3Apps.forEach(app => {
                 if (!p3BySlot[app.slot_id]) p3BySlot[app.slot_id] = [];
@@ -409,8 +415,11 @@ export default function SlotManagement() {
             let deletedCount = 0;
 
             applications.forEach(app => {
-                // If student won SOMETHING, but this specific app is NOT the winner
-                if (winners.has(app.student_id) && !winningReservationIds.has(app.id)) {
+                // If student won SOMETHING (here or previously), but this specific app is NOT the winner
+                // We check winners (this run) OR confirmedStudentIds (previous runs/manual)
+                const isWinner = winners.has(app.student_id) || confirmedStudentIds.has(app.student_id);
+
+                if (isWinner && !winningReservationIds.has(app.id)) {
                     batch.delete(doc(db, 'reservations', app.id));
                     deletedCount++;
                 }
