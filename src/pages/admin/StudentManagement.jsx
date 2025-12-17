@@ -150,7 +150,6 @@ export default function StudentManagement() {
                 // WAIT - Previous system used random ID or something else?
                 // Migration tool uses 'student.id' from existing doc. 
                 // New students should ideally use UID as Doc ID or keep auto-id.
-                // Let's stick to Auto-ID for the doc, but store auth_user_id inside.
                 // Actually, if we use Auto-ID, we can't easily guess it.
                 // But we don't need to guess it for now.
 
@@ -162,6 +161,7 @@ export default function StudentManagement() {
                 auth_user_id: uid,
                 shadow_email: shadowEmail,
                 auth_mode: 'name_match_v1',
+                password_changed: false, // Force change on first login
                 created_at: new Date().toISOString()
             });
             // Note: We are strictly NOT creating a public directory entry anymore.
@@ -241,6 +241,7 @@ export default function StudentManagement() {
                     initial_password: null,
                     auth_user_id: uid,
                     shadow_email: shadowEmail,
+                    password_changed: false, // Force change on first login
                     created_at: new Date().toISOString()
                 });
 
