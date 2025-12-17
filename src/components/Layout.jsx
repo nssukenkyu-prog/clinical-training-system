@@ -8,7 +8,8 @@ import {
     Users,
     SquareCheck,
     Bell,
-    ShieldCheck
+    ShieldCheck,
+    Settings
 } from 'lucide-react';
 import { auth } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
@@ -47,6 +48,7 @@ export default function Layout({ children, userRole: propUserRole, userName: pro
         { path: '/admin/students', icon: Users, label: '学生管理' },
         { path: '/admin/approvals', icon: SquareCheck, label: '実績承認' },
         { path: '/admin/slots', icon: CalendarDays, label: '枠管理' },
+        { path: '/admin/settings', icon: Settings, label: 'システム設定' },
     ];
 
     const links = isAdmin ? adminLinks : studentLinks;
