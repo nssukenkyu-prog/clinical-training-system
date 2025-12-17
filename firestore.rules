@@ -14,32 +14,36 @@ service cloud.firestore {
 
     // --- Collections ---
 
-    // 1. Public Directory
+    // 1. Public Directory: Admin clean-up allowed
     match /public_student_directory/{studentId} {
       allow read, write: if isAdmin();
     }
 
     // 2. Students Private Data
     match /students/{studentId} {
-      // FIX: Allow any authenticated user to read student data.
-      // This is necessary because students log in with generic IDs that aren't yet linked in Firestore.
-      allow read: if request.auth != null;
-      
-      // Writes still restricted
-      allow write: if isAdmin() || isStudentOwner(studentId);
+      allow read, write: if isAdmin() || isStudentOwner(studentId);
       allow create: if isAdmin();
     }
 
-    // 3. Admins
+    // 3. Admins: SECURED
+    // CRITICAL FIX: Prevent generic users from writing here to become admins.
+    // Writes must be done via Firebase Console or by an existing Admin.
     match /admins/{userId} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow write: if isAdmin(); 
     }
 
     // 4. Reservations
     match /reservations/{reservationId} {
-        // FIX: Allow any authenticated user to manage reservations.
-        // The application code handles filtering, preventing students from seeing others' data.
-        allow read, write: if request.auth != null;
+        allow read, write: if isAdmin() || (
+            request.auth != null &&
+            get(/databases/$(database)/documents/students/$(resource.data.student_id)).data.auth_user_id == request.auth.uid
+        );
+        
+        allow create: if isAdmin() || (
+            request.auth != null &&
+            get(/databases/$(database)/documents/students/$(request.resource.data.student_id)).data.auth_user_id == request.auth.uid
+        );
     }
     
     // 5. Slots

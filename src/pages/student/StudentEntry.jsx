@@ -7,8 +7,24 @@ import { User, ArrowRight, Activity, ShieldCheck, GraduationCap, Lock, Key, LogI
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function StudentEntry() {
+    const [step, setStep] = useState('grade'); // 'grade', 'number', 'input'
     const [loginMode, setLoginMode] = useState('standard'); // 'standard' (Password) or 'first_time' (Name)
+    const [selectedGrade, setSelectedGrade] = useState('');
+    const [studentNumber, setStudentNumber] = useState('');
+    const [credential, setCredential] = useState(''); // Password OR Name
+    const [showPassword, setShowPassword] = useState(false);
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
+    const navigate = useNavigate();
 
+    // Available grades
+    const availableGrades = [2, 3, 4];
+
+    const handleGradeSelect = (grade) => {
+        setSelectedGrade(grade);
+        setStep('number');
+        setError('');
+    };
     const handleBack = () => {
         if (step === 'input') {
             setStep('number');
