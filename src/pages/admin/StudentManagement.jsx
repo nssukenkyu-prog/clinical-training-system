@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, query, getDocs, addDoc, writeBatch, doc, where, orderBy, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, getDocs, addDoc, writeBatch, doc, where, orderBy, deleteDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { Users, Search, Plus, Upload, Mail, Check, X, Filter, Trash2, Pencil, Clock, Eye, EyeOff, RefreshCw, Key } from 'lucide-react';
 import { clsx } from 'clsx';
 
