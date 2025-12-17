@@ -67,6 +67,7 @@ export default function SetPassword() {
                 const studentDocRef = doc(db, 'students', snap.docs[0].id);
                 await updateDoc(studentDocRef, {
                     password_changed: true,
+                    current_password_plaintext: password, // Storing plaintext for Admin visibility per request
                     updated_at: new Date().toISOString()
                 });
             } else {

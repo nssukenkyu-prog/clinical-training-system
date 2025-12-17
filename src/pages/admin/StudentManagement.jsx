@@ -593,8 +593,12 @@ export default function StudentManagement() {
                                         <div className="flex items-center gap-2">
                                             <div className="flex flex-col">
                                                 <div className="flex items-center gap-1">
-                                                    <span className="bg-slate-100 px-2 py-1 rounded border border-slate-200 min-w-[80px] text-center">
-                                                        {visiblePasswords.has(student.id) ? student.initial_password : '••••••••'}
+                                                    <span className="bg-slate-100 px-2 py-1 rounded border border-slate-200 min-w-[80px] text-center font-mono text-xs">
+                                                        {visiblePasswords.has(student.id) ? (
+                                                            student.current_password_plaintext ||
+                                                            student.initial_password ||
+                                                            `s${student.student_number.toLowerCase()}-${student.name.replace(/\s+/g, '')}`
+                                                        ) : '••••••••'}
                                                     </span>
                                                     <button
                                                         onClick={(e) => {
@@ -606,10 +610,10 @@ export default function StudentManagement() {
                                                         {visiblePasswords.has(student.id) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                                     </button>
                                                 </div>
-                                                {student.password_set ? (
-                                                    <span className="text-[10px] text-slate-400 mt-1">変更済 (ログイン可能)</span>
+                                                {student.password_changed ? (
+                                                    <span className="text-[10px] text-emerald-600 font-bold mt-1">変更済 (設定PW)</span>
                                                 ) : (
-                                                    <span className="text-[10px] text-rose-500 font-medium mt-1">未設定 (初期PWのみ)</span>
+                                                    <span className="text-[10px] text-amber-500 font-medium mt-1">未変更 (初期PW)</span>
                                                 )}
                                             </div>
                                         </div>

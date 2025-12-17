@@ -161,8 +161,8 @@ export default function StudentEntry() {
             // Error handling
             if (loginMode === 'initial') {
                 // If default password failed, it likely means they CHANGED it.
-                if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-                    setError('初回ログインに失敗しました。既にパスワードを変更済みの場合は「通常ログイン」をご利用ください。');
+                if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found') {
+                    setError('初回ログインに失敗しました。既にパスワードを変更済みの可能性があります。「パスワード（通常）」タブからログインしてください。');
                 } else {
                     setError('ログインできませんでした。入力内容を確認してください。');
                 }
@@ -201,8 +201,8 @@ export default function StudentEntry() {
                             <button
                                 onClick={() => setLoginMode('password')}
                                 className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${loginMode === 'password'
-                                        ? 'bg-white text-primary shadow-sm'
-                                        : 'text-slate-400 hover:text-slate-600'
+                                    ? 'bg-white text-primary shadow-sm'
+                                    : 'text-slate-400 hover:text-slate-600'
                                     }`}
                             >
                                 パスワード
@@ -210,8 +210,8 @@ export default function StudentEntry() {
                             <button
                                 onClick={() => setLoginMode('initial')}
                                 className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${loginMode === 'initial'
-                                        ? 'bg-white text-primary shadow-sm'
-                                        : 'text-slate-400 hover:text-slate-600'
+                                    ? 'bg-white text-primary shadow-sm'
+                                    : 'text-slate-400 hover:text-slate-600'
                                     }`}
                             >
                                 初回 (氏名)
