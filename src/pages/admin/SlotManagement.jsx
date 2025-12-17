@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, query, where, getDocs, addDoc, deleteDoc, doc, writeBatch, updateDoc } from 'firebase/firestore';
-import { ChevronLeft, ChevronRight, Plus, Trash2, Calendar, Clock, Users, X, List, Grid, Info, UserCheck, AlertCircle, Wand2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Trash2, Calendar, Clock, Users, X, List, Grid, Info, UserCheck, AlertCircle, Wand2, Check } from 'lucide-react';
 import { clsx } from 'clsx';
 
 export default function SlotManagement() {
