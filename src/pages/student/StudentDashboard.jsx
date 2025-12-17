@@ -99,7 +99,7 @@ export default function StudentDashboard() {
     const reservedRemMinutes = totalReservedMinutes % 60;
 
     // Target (Mandatory) Time Logic
-    const TARGET_HOURS = 80;
+    const TARGET_HOURS = 21;
     const progressPercentage = Math.min(100, (totalMinutes / (TARGET_HOURS * 60)) * 100);
 
     // Upcoming Reservation

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, query, where, getDocs, addDoc, updateDoc, doc, Timestamp, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, updateDoc, doc, Timestamp, orderBy, documentId } from 'firebase/firestore';
 import { Clock, CheckCircle, LogIn, LogOut, User, AlertCircle, X } from 'lucide-react';
 import { clsx } from 'clsx';
 import { format } from 'date-fns';
@@ -53,12 +53,55 @@ export default function SiteKiosk() {
             const logsSnap = await getDocs(qLogs);
             const currentSessions = logsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-            // Filter out reservations that are already active
-            const activeStudentIds = new Set(currentSessions.map(s => s.student_id));
-            const pendingReservations = todayReservations.filter(r => !activeStudentIds.has(r.student_id));
+            // 3. Fetch Student Names (Enrich Data)
+            const allStudentIds = new Set([
+                ...todayReservations.map(r => r.student_id),
+                ...currentSessions.map(s => s.student_id)
+            ]);
+
+            const studentNames = {};
+            // Batch fetch names from Public Directory
+            // Using chunks of 10 for 'in' query or parallel getDoc
+            // Since public_directory key is UID, we can use documentId()
+            const idsToCheck = [...allStudentIds];
+
+            if (idsToCheck.length > 0) {
+                // Simple chunking for 'in' query
+                const chunks = [];
+                for (let i = 0; i < idsToCheck.length; i += 10) {
+                    chunks.push(idsToCheck.slice(i, i + 10));
+                }
+
+                for (const chunk of chunks) {
+                    const qStudents = query(
+                        collection(db, 'public_student_directory'),
+                        where(documentId(), 'in', chunk)
+                    );
+                    const snap = await getDocs(qStudents);
+                    snap.docs.forEach(d => {
+                        studentNames[d.id] = d.data().name;
+                    });
+                }
+            }
+
+            // Merge Names
+            const enrichedReservations = todayReservations.map(r => ({
+                ...r,
+                student_name: studentNames[r.student_id] || 'Unknown'
+            }));
+
+            const enrichedSessions = currentSessions.map(s => ({
+                ...s,
+                student_name: studentNames[s.student_id] || s.student_name || 'Unknown' // Fallback to log name
+            }));
+
+
+            // Filter out reservations that are already active (check-in done)
+            const activeStudentIds = new Set(enrichedSessions.map(s => s.student_id));
+            const pendingReservations = enrichedReservations.filter(r => !activeStudentIds.has(r.student_id));
 
             setReservations(pendingReservations);
-            setActiveSessions(currentSessions);
+            setActiveSessions(enrichedSessions);
         } catch (err) {
             console.error("Error fetching kiosk data:", err);
         } finally {
