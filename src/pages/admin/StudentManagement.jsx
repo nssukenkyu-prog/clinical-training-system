@@ -126,32 +126,36 @@ export default function StudentManagement() {
         }
     };
 
+    // Helper functions for random password
+    const generateRandomPassword = () => {
+        const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+        let pass = '';
+        for (let i = 0; i < 8; i++) {
+            pass += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return pass;
+    };
+
     const handleAddStudent = async (e) => {
         e.preventDefault();
 
+        if (!inputPassword) {
+            alert('パスワードを入力してください');
+            return;
+        }
+
         try {
-            // 1. Create Shadow Auth (Name-Based)
+            // 1. Create Shadow Auth using Input Password
             const shadowEmail = `${formData.studentNumber.toLowerCase()}@clinical-system.local`;
 
-            // Generate password from Name (Normalized)
-            const normalizedName = formData.name.replace(/\s+/g, '');
-            // Default Pw Format: s{studentNumber}-{Name(NoSpaces)}
-            const password = `s${formData.studentNumber.toLowerCase()}-${normalizedName}`;
-
             const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
-            const userCred = await createUserWithEmailAndPassword(secondaryAuth, shadowEmail, password);
+            const userCred = await createUserWithEmailAndPassword(secondaryAuth, shadowEmail, inputPassword);
             const uid = userCred.user.uid;
 
             await updateProfile(userCred.user, { displayName: formData.name });
 
-            // 2. Create in Firestore (Private Profile)
-            await setDoc(doc(db, 'students', uid), { // Use UID as Doc ID for consistency? 
-                // WAIT - Previous system used random ID or something else?
-                // Migration tool uses 'student.id' from existing doc. 
-                // New students should ideally use UID as Doc ID or keep auto-id.
-                // Actually, if we use Auto-ID, we can't easily guess it.
-                // But we don't need to guess it for now.
-
+            // 2. Create in Firestore
+            await setDoc(doc(db, 'students', uid), {
                 student_number: formData.studentNumber,
                 email: formData.email,
                 name: formData.name,
@@ -159,11 +163,11 @@ export default function StudentManagement() {
                 training_type: formData.trainingType,
                 auth_user_id: uid,
                 shadow_email: shadowEmail,
-                auth_mode: 'name_match_v1',
-                password_changed: false, // Force change on first login
+                auth_mode: 'admin_managed',
+                password_changed: false,
+                current_password_plaintext: inputPassword,
                 created_at: new Date().toISOString()
             });
-            // Note: We are strictly NOT creating a public directory entry anymore.
 
             setShowModal(false);
             setFormData({ studentNumber: '', email: '', name: '', grade: 2, trainingType: 'I' });
@@ -174,7 +178,7 @@ export default function StudentManagement() {
         } catch (error) {
             console.error(error);
             if (error.code === 'auth/email-already-in-use') {
-                alert(`学籍番号 ${formData.studentNumber} は既に登録されています。\n一覧に表示されていない場合は、システム管理者に連絡してください（Authデータ残存の可能性があります）。`);
+                alert(`学籍番号 ${formData.studentNumber} は既に登録されています。`);
             } else {
                 alert('学生登録に失敗しました: ' + error.message);
             }
