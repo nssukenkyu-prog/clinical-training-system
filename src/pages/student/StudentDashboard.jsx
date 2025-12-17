@@ -29,7 +29,7 @@ export default function StudentDashboard() {
             try {
                 // Fetch Student
                 const studentsRef = collection(db, 'students');
-                const qStudent = query(studentsRef, where('__name__', '==', studentId));
+                const qStudent = query(studentsRef, where('__name__', '==', foundStudentId));
                 const studentSnap = await getDocs(qStudent);
 
                 if (!studentSnap.empty) {
@@ -40,7 +40,7 @@ export default function StudentDashboard() {
                 const reservationsRef = collection(db, 'reservations');
                 const qReservations = query(
                     reservationsRef,
-                    where('student_id', '==', studentId),
+                    where('student_id', '==', foundStudentId),
                     orderBy('slot_date', 'desc'),
                     orderBy('slot_start_time', 'asc')
                 );

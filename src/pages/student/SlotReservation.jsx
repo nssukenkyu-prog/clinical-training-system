@@ -301,7 +301,6 @@ export default function SlotReservation() {
                         mode: 'no-cors',
                         body: JSON.stringify({
                             to: student.email,
-                            to: student.email,
                             subject: isLottery ? '【臨床実習】実習抽選申込のお知らせ' : '【臨床実習】実習予約のお知らせ',
                             body: `
 <!DOCTYPE html>
