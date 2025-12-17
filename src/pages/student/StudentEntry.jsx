@@ -62,23 +62,27 @@ export default function StudentEntry() {
         let isFirstTimeLogin = false;
 
         try {
-            // Attempt 1: Treat input as PASSWORD
-            try {
-                const userCred = await signInWithEmailAndPassword(auth, shadowEmail, credential);
-                user = userCred.user;
-            } catch (firstErr) {
-                // If wrong password, it might be a NAME input for first-time login.
-                if (firstErr.code === 'auth/wrong-password' || firstErr.code === 'auth/invalid-credential') {
-                    // Attempt 2: Treat input as NAME -> Construct Default Password
-                    // Default Pw Format: s{studentNumber}-{Name(NoSpaces)}
-                    const normalizedInput = credential.replace(/\s+/g, '');
-                    const defaultPassword = `s${studentNumber.toLowerCase()}-${normalizedInput}`;
+            // Logic:
+            // 1. If credential is EMPTY -> Try Default ID-based Password `s{ID}-{ID}`.
+            // 2. If credential is NOT EMPTY -> Try as Password.
 
-                    const userCred2 = await signInWithEmailAndPassword(auth, shadowEmail, defaultPassword);
-                    user = userCred2.user;
-                    isFirstTimeLogin = true; // Flag that we succeeded via Name fallback
-                } else {
-                    throw firstErr; // Throw other errors (like network, too many requests)
+            if (!credential.trim()) {
+                // First Time Login Mode (Empty Password)
+                const defaultPassword = `s${studentNumber.toLowerCase()}-${studentNumber.toLowerCase()}`;
+                const userCred = await signInWithEmailAndPassword(auth, shadowEmail, defaultPassword);
+                user = userCred.user;
+                isFirstTimeLogin = true;
+
+            } else {
+                // Normal Password Mode
+                try {
+                    const userCred = await signInWithEmailAndPassword(auth, shadowEmail, credential);
+                    user = userCred.user;
+                } catch (authErr) {
+                    // We do NOT fall back to default password here if they typed something.
+                    // Because if they typed their Name, it will fail (we stopped Name support).
+                    // If they typed a wrong password, it should fail.
+                    throw authErr;
                 }
             }
 
@@ -94,7 +98,6 @@ export default function StudentEntry() {
                 studentDoc = snap.docs[0];
             } else {
                 // If finding by auth_user_id fails, try student_number as fallback
-                // This handles legacy users or edge cases where auth_user_id wasn't written
                 const q2 = query(collection(db, 'students'), where('student_number', '==', studentNumber));
                 const snap2 = await getDocs(q2);
                 if (!snap2.empty) studentDoc = snap2.docs[0];
@@ -108,7 +111,7 @@ export default function StudentEntry() {
             const isPasswordChanged = studentDoc?.data()?.password_changed === true;
 
             if (isFirstTimeLogin) {
-                // User logged in via Name (Default Password).
+                // User logged in via Empty Password (Default).
                 // They MUST change password.
                 navigate('/student/set-password');
             } else {
@@ -123,9 +126,12 @@ export default function StudentEntry() {
         } catch (err) {
             console.error("Login failed:", err);
             if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
-                setError('ログインできませんでした。学籍番号、またはパスワード（初回は氏名）を確認してください。');
+                setError('ログインできませんでした。学籍番号またはパスワードを確認してください。（初回の場合はパスワード欄を空欄にしてください）');
             } else if (err.code === 'auth/too-many-requests') {
                 setError('ログイン試行回数が多すぎます。しばらく待ってから再試行してください。');
+            } else if (err.code === 'auth/missing-password') {
+                // Should be caught by trim check, but just in case
+                setError('パスワードを入力するか、初回の場合は空欄のままログインしてください。');
             } else {
                 setError('エラーが発生しました: ' + err.message);
             }
@@ -260,8 +266,7 @@ export default function StudentEntry() {
                                                 className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-12 pr-12 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-medium shadow-sm transition-caret"
                                                 value={credential}
                                                 onChange={(e) => setCredential(e.target.value)}
-                                                placeholder="パスワード (初回は氏名)"
-                                                required
+                                                placeholder="パスワード (初回は空欄)"
                                                 autoFocus
                                             />
                                             <button
@@ -274,7 +279,7 @@ export default function StudentEntry() {
                                             </button>
                                         </div>
                                         <p className="text-xs text-slate-500 ml-1">
-                                            ※初回ログイン時はご自身の<strong>氏名</strong>を入力してください
+                                            ※初回ログイン時は<strong>空欄のまま</strong>ログインボタンを押してください
                                         </p>
                                     </div>
 

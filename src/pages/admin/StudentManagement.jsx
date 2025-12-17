@@ -130,14 +130,12 @@ export default function StudentManagement() {
         e.preventDefault();
 
         try {
-            // 1. Create Shadow Auth (Name-Based)
+            // 1. Create Shadow Auth (ID-Based)
             const shadowEmail = `${formData.studentNumber.toLowerCase()}@clinical-system.local`;
 
-            // Generate password from Name (Normalized)
-            // Generate password from Name (Normalized)
-            const normalizedName = formData.name.replace(/\s+/g, '');
-            // FIX: Standardize password format to match StudentEntry.jsx logic
-            const password = `s${formData.studentNumber.toLowerCase()}-${normalizedName}`;
+            // FIX: Use ID-based password to avoid Name ambiguity
+            // Format: s{ID}-{ID}
+            const password = `s${formData.studentNumber.toLowerCase()}-${formData.studentNumber.toLowerCase()}`;
 
             const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
             const userCred = await createUserWithEmailAndPassword(secondaryAuth, shadowEmail, password);
@@ -209,12 +207,10 @@ export default function StudentManagement() {
                 const [studentNumber, email, name, grade, trainingType] = line.split(',').map(s => s.trim());
                 if (!studentNumber) continue;
 
-                // 1. Auth
+                // 1. Auth (ID-Based)
                 const shadowEmail = `${studentNumber.toLowerCase()}@clinical-system.local`;
-                // FIX: Standardize password format for Bulk Import too!
-                // Previously it was just ID, but StudentEntry expects s{ID}-{Name} logic.
-                const normalizedName = name.replace(/\s+/g, '');
-                const password = `s${studentNumber.toLowerCase()}-${normalizedName}`;
+                // FIX: Use ID-based password for consistency
+                const password = `s${studentNumber.toLowerCase()}-${studentNumber.toLowerCase()}`;
                 let uid = null;
 
                 try {
@@ -597,7 +593,7 @@ export default function StudentManagement() {
                                                         {visiblePasswords.has(student.id) ? (
                                                             student.current_password_plaintext ||
                                                             student.initial_password ||
-                                                            `s${student.student_number.toLowerCase()}-${student.name.replace(/\s+/g, '')}`
+                                                            `s${student.student_number.toLowerCase()}-${student.student_number.toLowerCase()}`
                                                         ) : '••••••••'}
                                                     </span>
                                                     <button
