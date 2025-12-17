@@ -3,21 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import { db, auth } from '../../lib/firebase';
 import { collection, query, where, getDocs, updateDoc, doc, orderBy } from 'firebase/firestore';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { User, ArrowRight, Activity, ShieldCheck, GraduationCap, Lock, Key, LogIn } from 'lucide-react';
+import { User, ArrowRight, Activity, ShieldCheck, GraduationCap, Lock, Key, LogIn, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function StudentEntry() {
-    const [loginMode, setLoginMode] = useState('password'); // 'password' (Default) or 'initial' (Name)
     const [step, setStep] = useState('grade'); // 'grade', 'number', 'input'
     const [selectedGrade, setSelectedGrade] = useState('');
     const [studentNumber, setStudentNumber] = useState('');
-    const [studentName, setStudentName] = useState(''); // Only for Initial Mode
-    const [inputPassword, setInputPassword] = useState(''); // Only for Password Mode
+    const [credential, setCredential] = useState(''); // Password OR Name
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
-    // Available grades (Not fetching list anymore)
+    // Available grades
     const availableGrades = [2, 3, 4];
 
     const handleGradeSelect = (grade) => {
@@ -29,8 +28,7 @@ export default function StudentEntry() {
     const handleBack = () => {
         if (step === 'input') {
             setStep('number');
-            setStudentName('');
-            setInputPassword('');
+            setCredential('');
         } else if (step === 'number') {
             setStep('grade');
             setStudentNumber('');
@@ -49,7 +47,7 @@ export default function StudentEntry() {
             setError('学籍番号は半角英数字で入力してください');
             return;
         }
-        setStep('input'); // Move to Name or Password input
+        setStep('input');
         setError('');
     };
 
@@ -58,97 +56,63 @@ export default function StudentEntry() {
         setError('');
         setLoading(true);
 
-        try {
-            const shadowEmail = `${studentNumber.toLowerCase()}@clinical-system.local`;
-            let passwordToUse = '';
+        // Common Vars
+        const shadowEmail = `${studentNumber.toLowerCase()}@clinical-system.local`;
+        let user = null;
+        let isFirstTimeLogin = false;
 
-            if (loginMode === 'password') {
-                if (!inputPassword) {
-                    setError('パスワードを入力してください');
-                    setLoading(false);
-                    return;
+        try {
+            // Attempt 1: Treat input as PASSWORD
+            try {
+                const userCred = await signInWithEmailAndPassword(auth, shadowEmail, credential);
+                user = userCred.user;
+            } catch (firstErr) {
+                // If wrong password, it might be a NAME input for first-time login.
+                if (firstErr.code === 'auth/wrong-password' || firstErr.code === 'auth/invalid-credential') {
+                    // Attempt 2: Treat input as NAME -> Construct Default Password
+                    // Default Pw Format: s{studentNumber}-{Name(NoSpaces)}
+                    const normalizedInput = credential.replace(/\s+/g, '');
+                    const defaultPassword = `s${studentNumber.toLowerCase()}-${normalizedInput}`;
+
+                    const userCred2 = await signInWithEmailAndPassword(auth, shadowEmail, defaultPassword);
+                    user = userCred2.user;
+                    isFirstTimeLogin = true; // Flag that we succeeded via Name fallback
+                } else {
+                    throw firstErr; // Throw other errors (like network, too many requests)
                 }
-                passwordToUse = inputPassword;
-            } else {
-                // Initial Mode (Name-based)
-                const normalizedName = studentName.replace(/\s+/g, '');
-                if (normalizedName.length < 1) {
-                    setError('氏名を入力してください');
-                    setLoading(false);
-                    return;
-                }
-                // Generate default password: s{ID}-{Name}
-                passwordToUse = `s${studentNumber.toLowerCase()}-${normalizedName}`;
             }
 
-            // 1. Attempt Sign In
-            const userCred = await signInWithEmailAndPassword(auth, shadowEmail, passwordToUse);
-            const user = userCred.user;
+            // --- Authentication Successful ---
 
-            // 2. Check 'password_changed' status in Firestore
-            // We need to find the student doc to check the flag.
-            // Using auth_user_id (preferred) or email fallback.
-            let studentDoc = null;
+            // Firestore Check (for password_changed flag)
+            // Use auth_user_id (safest)
             const q = query(collection(db, 'students'), where('auth_user_id', '==', user.uid));
             const snap = await getDocs(q);
 
+            let studentDoc = null;
             if (!snap.empty) {
                 studentDoc = snap.docs[0];
             } else {
-                // Fallback email query if auth_user_id missing (legacy)
-                const q2 = query(collection(db, 'students'), where('email', '==', shadowEmail)); // shadowEmail matching might fail if real email stored
-                // Actually, let's just stick to Auth UID. If missing, we have a bigger problem.
-                // But for safety, we can try matching by student_number?
-                const q3 = query(collection(db, 'students'), where('student_number', '==', studentNumber)); // Assuming studentNumber is unique
-                const snap3 = await getDocs(q3);
-                if (!snap3.empty) studentDoc = snap3.docs[0];
+                // If finding by auth_user_id fails, try student_number as fallback
+                // This handles legacy users or edge cases where auth_user_id wasn't written
+                const q2 = query(collection(db, 'students'), where('student_number', '==', studentNumber));
+                const snap2 = await getDocs(q2);
+                if (!snap2.empty) studentDoc = snap2.docs[0];
             }
 
-            // Session Storage Setup
+            // Session Setup
             sessionStorage.setItem('clinical_student_id', studentDoc ? studentDoc.id : 'auth-session');
-            sessionStorage.setItem('clinical_student_name', user.displayName || studentName || 'Student');
+            sessionStorage.setItem('clinical_student_name', user.displayName || 'Student');
 
-            // 3. Routing Logic
+            // Routing Logic
             const isPasswordChanged = studentDoc?.data()?.password_changed === true;
 
-            if (loginMode === 'initial') {
-                if (isPasswordChanged) {
-                    // IF user already changed password but tried to use Name login
-                    // Security choice: Allow it? Or Force Password?
-                    // "The user requested: 2回目以降のログインは，その設定したパスワードを持ってログインできるようにしたい"
-                    // Usually this implies disabling the "Name" login.
-                    // Let's warn them and force them to use Password Login?
-                    // OR, if the algorithm matches, maybe they just typed the "initial password" manually?
-                    // Wait, in 'initial' mode we GENERATED the password.
-                    // If they CHANGED it, the generated password `s{ID}-{Name}` WON'T WORK against Auth!
-                    // So `signInWithEmailAndPassword` would have FAILED above if the password changed!
-                    // EXCEPTION: Unless they changed it TO the same thing (unlikely).
-
-                    // So if we are here, it means the password IS STILL `s{ID}-{Name}` (or consistent with it).
-                    // So actually, `password_changed` must be false (or they reset it).
-                    // But if `password_changed` is true in DB, but Auth worked with default password...
-                    // That means they changed it back? Or logic error.
-                    // Anyway, if we are here, Auth SUCCEEDED.
-
-                    // Logic:
-                    // If (Initial Mode) AND (Auth Success) AND (PasswordChanged == True) -> Strange state.
-                    // If (Initial Mode) AND (Auth Success) AND (PasswordChanged == False) -> Redirect to SetPassword.
-
-                    if (isPasswordChanged) {
-                        // They somehow logged in with default password even though flagged as changed.
-                        navigate('/student/dashboard');
-                    } else {
-                        // Force Password Change
-                        navigate('/student/set-password');
-                    }
-                } else {
-                    // Normal Initial Login -> Set Password
-                    navigate('/student/set-password');
-                }
+            if (isFirstTimeLogin) {
+                // User logged in via Name (Default Password).
+                // They MUST change password.
+                navigate('/student/set-password');
             } else {
-                // Password Mode
-                // If they haven't changed it yet, but use Password Mode (maybe they knew the default pw?)
-                // We should still force them if flag is false.
+                // User logged in via Password.
                 if (!isPasswordChanged) {
                     navigate('/student/set-password');
                 } else {
@@ -158,16 +122,12 @@ export default function StudentEntry() {
 
         } catch (err) {
             console.error("Login failed:", err);
-            // Error handling
-            if (loginMode === 'initial') {
-                // If default password failed, it likely means they CHANGED it.
-                if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found') {
-                    setError('初回ログインに失敗しました。既にパスワードを変更済みの可能性があります。「パスワード（通常）」タブからログインしてください。');
-                } else {
-                    setError('ログインできませんでした。入力内容を確認してください。');
-                }
+            if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
+                setError('ログインできませんでした。学籍番号、またはパスワード（初回は氏名）を確認してください。');
+            } else if (err.code === 'auth/too-many-requests') {
+                setError('ログイン試行回数が多すぎます。しばらく待ってから再試行してください。');
             } else {
-                setError('認証に失敗しました。正しいパスワードを入力してください。');
+                setError('エラーが発生しました: ' + err.message);
             }
         } finally {
             setLoading(false);
@@ -189,35 +149,11 @@ export default function StudentEntry() {
                         学生ログイン
                     </h1>
                     <p className="text-slate-500">
-                        {loginMode === 'password' ? '通常ログイン' : '初回ログイン (パスワード設定)'}
+                        実習支援システム
                     </p>
                 </div>
 
                 <div className="glass-panel p-8 rounded-2xl shadow-2xl bg-white/80 transition-all duration-300">
-
-                    {/* Mode Toggle Tabs */}
-                    {step === 'grade' && (
-                        <div className="flex p-1 bg-slate-100 rounded-xl mb-6">
-                            <button
-                                onClick={() => setLoginMode('password')}
-                                className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${loginMode === 'password'
-                                    ? 'bg-white text-primary shadow-sm'
-                                    : 'text-slate-400 hover:text-slate-600'
-                                    }`}
-                            >
-                                パスワード
-                            </button>
-                            <button
-                                onClick={() => setLoginMode('initial')}
-                                className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${loginMode === 'initial'
-                                    ? 'bg-white text-primary shadow-sm'
-                                    : 'text-slate-400 hover:text-slate-600'
-                                    }`}
-                            >
-                                初回 (氏名)
-                            </button>
-                        </div>
-                    )}
 
                     <AnimatePresence mode="wait">
                         {step === 'grade' && (
@@ -303,7 +239,7 @@ export default function StudentEntry() {
                                 <div className="text-center mb-6">
                                     <div className="text-sm text-slate-500 font-mono mb-1">{studentNumber}</div>
                                     <h2 className="text-xl font-bold text-slate-900">
-                                        {loginMode === 'password' ? 'パスワードを入力' : '氏名を入力'}
+                                        認証
                                     </h2>
                                 </div>
 
@@ -315,40 +251,32 @@ export default function StudentEntry() {
                                 )}
 
                                 <form onSubmit={handleLogin} className="space-y-4">
-                                    {loginMode === 'password' ? (
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium text-slate-700 ml-1">パスワード</label>
-                                            <div className="relative group">
-                                                <Key className="absolute left-4 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-primary transition-colors" />
-                                                <input
-                                                    type="password"
-                                                    className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-12 pr-4 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-medium shadow-sm transition-caret"
-                                                    value={inputPassword}
-                                                    onChange={(e) => setInputPassword(e.target.value)}
-                                                    placeholder="••••••••"
-                                                    required
-                                                    autoFocus
-                                                />
-                                            </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-slate-700 ml-1">パスワード</label>
+                                        <div className="relative group">
+                                            <Key className="absolute left-4 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-primary transition-colors" />
+                                            <input
+                                                type={showPassword ? "text" : "password"}
+                                                className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-12 pr-12 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-medium shadow-sm transition-caret"
+                                                value={credential}
+                                                onChange={(e) => setCredential(e.target.value)}
+                                                placeholder="パスワード (初回は氏名)"
+                                                required
+                                                autoFocus
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPassword(!showPassword)}
+                                                className="absolute right-4 top-3.5 text-slate-400 hover:text-slate-600 transition-colors focus:outline-none"
+                                                tabIndex={-1}
+                                            >
+                                                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                            </button>
                                         </div>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium text-slate-700 ml-1">氏名</label>
-                                            <div className="relative group">
-                                                <User className="absolute left-4 top-3.5 w-5 h-5 text-slate-400 group-focus-within:text-primary transition-colors" />
-                                                <input
-                                                    type="text"
-                                                    className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-12 pr-4 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-medium shadow-sm"
-                                                    value={studentName}
-                                                    onChange={(e) => setStudentName(e.target.value)}
-                                                    placeholder="山田 太郎"
-                                                    required
-                                                    autoFocus
-                                                />
-                                            </div>
-                                            <p className="text-xs text-slate-400 ml-1">※スペースはあってもなくても構いません</p>
-                                        </div>
-                                    )}
+                                        <p className="text-xs text-slate-500 ml-1">
+                                            ※初回ログイン時はご自身の<strong>氏名</strong>を入力してください
+                                        </p>
+                                    </div>
 
                                     <button
                                         type="submit"
@@ -359,7 +287,7 @@ export default function StudentEntry() {
                                             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                         ) : (
                                             <>
-                                                {loginMode === 'password' ? 'ログイン' : '次へ（パスワード設定）'}
+                                                ログイン
                                                 <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                                             </>
                                         )}
