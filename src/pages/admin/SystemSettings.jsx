@@ -28,7 +28,8 @@ export default function SystemSettings() {
 
             if (!querySnapshot.empty) {
                 const docData = querySnapshot.docs[0];
-                setSettings(docData.data().value);
+                // Merge with current defaults to ensure new keys (like lotteryMode) exist even if DB is old
+                setSettings(prev => ({ ...prev, ...docData.data().value }));
                 setDocId(docData.id);
             }
         } catch (error) {

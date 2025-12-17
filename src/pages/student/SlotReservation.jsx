@@ -36,8 +36,12 @@ export default function SlotReservation() {
                     setExistingReservations(resSnap.docs.map(d => d.data()));
                 }
             }
-            const settingsDoc = await getDocs(collection(db, 'settings'));
-            if (!settingsDoc.empty) setSettings(settingsDoc.docs[0].data());
+            const settingsRef = collection(db, 'settings');
+            const q = query(settingsRef, where('key', '==', 'training_config'));
+            const settingsDoc = await getDocs(q);
+            if (!settingsDoc.empty) {
+                setSettings(settingsDoc.docs[0].data().value);
+            }
         };
         fetchStudentAndSettings();
     }, []);
