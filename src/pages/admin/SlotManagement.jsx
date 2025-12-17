@@ -398,7 +398,10 @@ export default function SlotManagement() {
 
             // 1. Updates for winners
             updates.forEach(u => {
-                batch.update(doc(db, 'reservations', u.id), { status: u.status });
+                batch.update(doc(db, 'reservations', u.id), {
+                    status: u.status,
+                    is_first_day: true // Mark as First Day based on Lottery rules
+                });
             });
 
             // 2. Cleanup for winners (Delete other applications)
