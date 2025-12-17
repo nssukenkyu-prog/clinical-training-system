@@ -14,6 +14,7 @@ export default function SlotReservation() {
     const [selectedSlot, setSelectedSlot] = useState(null);
     const [showTimeModal, setShowTimeModal] = useState(false);
     const [customStartTime, setCustomStartTime] = useState('');
+    const [customEndTime, setCustomEndTime] = useState('');
     const [reserving, setReserving] = useState(false);
     const [reservationPriority, setReservationPriority] = useState(1);
     const [existingReservations, setExistingReservations] = useState([]);
