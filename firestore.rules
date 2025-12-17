@@ -23,9 +23,10 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
-    // 2. Students Private Data: Strictly controlled
+    // 2. Students Private Data
     match /students/{studentId} {
-      allow read, write: if isAdmin() || isStudentOwner(studentId);
+      allow read: if isAdmin() || isStudentOwner(studentId) || resource.data.email == request.auth.token.email;
+      allow write: if isAdmin() || isStudentOwner(studentId);
       allow create: if isAdmin();
     }
 
@@ -36,19 +37,18 @@ service cloud.firestore {
 
     // 4. Reservations: Protecting schedule privacy
     match /reservations/{reservationId} {
-        // Admin can read/write all.
-        // Student can read/write their own (checked via student_id field -> student doc -> auth_user_id)
-        // Note: For Kiosk (Unauth), this block denies access. Kiosk MUST be Admin-authenticated for full checking.
-        
         allow read, write: if isAdmin() || (
-            request.auth != null &&
-            get(/databases/$(database)/documents/students/$(resource.data.student_id)).data.auth_user_id == request.auth.uid
+            request.auth != null && (
+                get(/databases/$(database)/documents/students/$(resource.data.student_id)).data.auth_user_id == request.auth.uid ||
+                get(/databases/$(database)/documents/students/$(resource.data.student_id)).data.email == request.auth.token.email
+            )
         );
         
-        // Allow create if authenticated and the new doc's student owner matches
         allow create: if isAdmin() || (
-            request.auth != null &&
-            get(/databases/$(database)/documents/students/$(request.resource.data.student_id)).data.auth_user_id == request.auth.uid
+            request.auth != null && (
+                get(/databases/$(database)/documents/students/$(request.resource.data.student_id)).data.auth_user_id == request.auth.uid ||
+                get(/databases/$(database)/documents/students/$(request.resource.data.student_id)).data.email == request.auth.token.email
+            )
         );
     }
     

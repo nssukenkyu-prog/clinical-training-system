@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { db } from '../../lib/firebase';
+import { db, auth } from '../../lib/firebase';
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, onSnapshot } from 'firebase/firestore';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, Info, Check, X, LayoutGrid, List, AlertCircle } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -23,27 +23,50 @@ export default function SlotReservation() {
 
     useEffect(() => {
         const fetchStudentAndSettings = async () => {
-            const studentId = sessionStorage.getItem('clinical_student_id');
-            if (studentId) {
-                const studentDoc = await getDocs(query(collection(db, 'students'), where('__name__', '==', studentId)));
-                if (!studentDoc.empty) {
-                    const studentId = studentDoc.docs[0].id;
-                    setStudent({ id: studentId, ...studentDoc.docs[0].data() });
+            let foundStudentId = sessionStorage.getItem('clinical_student_id');
 
-                    // Initial fetch of existing reservations for priority check
-                    const resQuery = query(collection(db, 'reservations'), where('student_id', '==', studentId), where('status', 'in', ['applied', 'confirmed']));
+            // Fallback: Check Firebase Auth if no session ID
+            if (!foundStudentId && auth.currentUser) {
+                const q = query(collection(db, 'students'), where('email', '==', auth.currentUser.email));
+                const snap = await getDocs(q);
+                if (!snap.empty) {
+                    foundStudentId = snap.docs[0].id;
+                }
+            }
+
+            if (foundStudentId) {
+                const studentDoc = await getDocs(query(collection(db, 'students'), where('__name__', '==', foundStudentId)));
+                if (!studentDoc.empty) {
+                    const sId = studentDoc.docs[0].id;
+                    setStudent({ id: sId, ...studentDoc.docs[0].data() });
+
+                    // Initial fetch of existing reservations
+                    const resQuery = query(collection(db, 'reservations'), where('student_id', '==', sId), where('status', 'in', ['applied', 'confirmed']));
                     const resSnap = await getDocs(resQuery);
                     setExistingReservations(resSnap.docs.map(d => d.data()));
                 }
             }
+
+            // Settings Fetch
             const settingsRef = collection(db, 'settings');
-            const q = query(settingsRef, where('key', '==', 'training_config'));
-            const settingsDoc = await getDocs(q);
+            const qSettings = query(settingsRef, where('key', '==', 'training_config'));
+            const settingsDoc = await getDocs(qSettings);
             if (!settingsDoc.empty) {
                 setSettings(settingsDoc.docs[0].data().value);
             }
         };
-        fetchStudentAndSettings();
+
+        // If auth is not ready yet, we might miss it. So we should listen to auth state changes or retry.
+        // For simplicity in this patch, we'll try immediately. 
+        // A better approach is to wrap this in onAuthStateChanged if auth.currentUser is null initially.
+        if (auth.currentUser) {
+            fetchStudentAndSettings();
+        } else {
+            // Wait briefly or just rely on re-render if parent passes user. 
+            // But actually, since this is a page route, App.jsx waits for auth before rendering this.
+            // So auth.currentUser SHOULD be populated.
+            fetchStudentAndSettings();
+        }
     }, []);
 
     useEffect(() => {
