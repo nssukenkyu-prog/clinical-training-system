@@ -134,8 +134,10 @@ export default function StudentManagement() {
             const shadowEmail = `${formData.studentNumber.toLowerCase()}@clinical-system.local`;
 
             // Generate password from Name (Normalized)
+            // Generate password from Name (Normalized)
             const normalizedName = formData.name.replace(/\s+/g, '');
-            const password = `s${formData.studentNumber}-${normalizedName}`;
+            // FIX: Standardize password format to match StudentEntry.jsx logic
+            const password = `s${formData.studentNumber.toLowerCase()}-${normalizedName}`;
 
             const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
             const userCred = await createUserWithEmailAndPassword(secondaryAuth, shadowEmail, password);
@@ -205,7 +207,10 @@ export default function StudentManagement() {
 
                 // 1. Auth
                 const shadowEmail = `${studentNumber.toLowerCase()}@clinical-system.local`;
-                const password = studentNumber; // Default password for bulk import = Student ID
+                // FIX: Standardize password format for Bulk Import too!
+                // Previously it was just ID, but StudentEntry expects s{ID}-{Name} logic.
+                const normalizedName = name.replace(/\s+/g, '');
+                const password = `s${studentNumber.toLowerCase()}-${normalizedName}`;
                 let uid = null;
 
                 try {
