@@ -209,14 +209,16 @@ export default function StudentManagement() {
             // Limit batch size? Firestore limit is 500.
             // Loop
             for (const line of lines) {
-                const [studentNumber, email, name, grade, trainingType] = line.split(',').map(s => s.trim());
+                const [studentNumber, email, name, grade, trainingType, csvPassword] = line.split(',').map(s => s.trim());
                 if (!studentNumber) continue;
 
                 // 1. Auth (Name-Based)
                 const shadowEmail = `${studentNumber.toLowerCase()}@clinical-system.local`;
                 // Generate Pw
                 const normalizedName = name.replace(/\s+/g, '');
-                const password = `s${studentNumber.toLowerCase()}-${normalizedName}`;
+                // Default: s{ID}-{Name} if no password provided
+                const password = csvPassword || `s${studentNumber.toLowerCase()}-${normalizedName}`;
+
                 let uid = null;
 
                 try {
@@ -225,12 +227,16 @@ export default function StudentManagement() {
                     uid = userCred.user.uid;
                 } catch (e) {
                     console.warn(`Auth failed for ${name}:`, e.code);
-                    // Continue? If email exists, maybe we just want to create DB entry?
-                    // We'll proceed without UID if creation fails (e.g. valid duplicate)
+                    // For bulk, if auth fails (e.g. email exists), we might skip or continue.
+                    // If we can't get UID, we can't link effectively for strict rules.
+                    // But maybe the user already exists in Auth?
+                    // Let's assume for now we skip DB creation if Auth fails to avoid misalignment.
+                    continue;
                 }
 
                 // 2. DB Refs
-                const newDocRef = doc(collection(db, 'students'));
+                // Use UID as Doc ID for consistency with Single Add
+                const newDocRef = doc(db, 'students', uid);
 
                 // Private
                 batch.set(newDocRef, {
@@ -243,12 +249,13 @@ export default function StudentManagement() {
                     initial_password: null,
                     auth_user_id: uid,
                     shadow_email: shadowEmail,
-                    password_changed: false, // Force change on first login
+                    password_changed: false,
+                    current_password_plaintext: password,
                     created_at: new Date().toISOString()
                 });
 
                 // Public
-                const publicRef = doc(db, 'public_student_directory', newDocRef.id);
+                const publicRef = doc(db, 'public_student_directory', uid);
                 batch.set(publicRef, {
                     name,
                     student_number: studentNumber,
@@ -264,7 +271,7 @@ export default function StudentManagement() {
             setShowBulkModal(false);
             setCsvData('');
             loadStudents();
-            alert(`${successCount}名の学生を登録しました`);
+            alert(`${successCount}名の学生を登録しました\n※各学生へのパスワード通知を忘れずに行ってください。`);
 
         } catch (error) {
             console.error(error);
@@ -442,15 +449,15 @@ export default function StudentManagement() {
             return;
         }
 
-        const headers = ['学籍番号', '氏名', 'メールアドレス', '学年', '実習区分', '累積時間(分)', '登録状況'];
+        const headers = ['学籍番号', '氏名', 'メールアドレス', '学年', '実習区分', 'パスワード', '累積時間(分)'];
         const rows = filteredStudents.map(s => [
             s.student_number,
             s.name,
             s.email,
             s.grade,
             s.training_type,
-            getTotalMinutes(s),
-            s.auth_user_id ? '登録済' : '未登録'
+            s.current_password_plaintext || 'N/A',
+            getTotalMinutes(s)
         ]);
 
         const csvContent = [
@@ -598,8 +605,7 @@ export default function StudentManagement() {
                                                     <span className="bg-slate-100 px-2 py-1 rounded border border-slate-200 min-w-[80px] text-center font-mono text-xs">
                                                         {visiblePasswords.has(student.id) ? (
                                                             student.current_password_plaintext ||
-                                                            student.initial_password ||
-                                                            `s${student.student_number.toLowerCase()}-${student.name.replace(/\s+/g, '')}`
+                                                            student.initial_password || 'N/A'
                                                         ) : '••••••••'}
                                                     </span>
                                                     <button
@@ -612,11 +618,6 @@ export default function StudentManagement() {
                                                         {visiblePasswords.has(student.id) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                                     </button>
                                                 </div>
-                                                {student.password_changed ? (
-                                                    <span className="text-[10px] text-emerald-600 font-bold mt-1">変更済 (設定PW)</span>
-                                                ) : (
-                                                    <span className="text-[10px] text-amber-500 font-medium mt-1">未変更 (初期PW)</span>
-                                                )}
                                             </div>
                                         </div>
                                     </td>
