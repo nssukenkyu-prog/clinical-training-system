@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, query, where, getDocs, addDoc, deleteDoc, doc, writeBatch, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, deleteDoc, doc, writeBatch, updateDoc, documentId } from 'firebase/firestore';
 import { ChevronLeft, ChevronRight, Plus, Trash2, Calendar, Clock, Users, X, List, Grid, Info, UserCheck, AlertCircle, Wand2, Check } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -427,7 +427,83 @@ export default function SlotManagement() {
 
             await batch.commit();
 
-            alert(`自動割り当てが完了しました。\n当選: ${updates.length}件\n自動削除(重複申込): ${deletedCount}件`);
+            // 3. Send "First Day Determined" Emails
+            // We need to fetch student emails first
+            const winnerIds = Array.from(winners);
+            const studentEmails = {};
+
+            if (winnerIds.length > 0) {
+                // Chunk fetch
+                const chunks = [];
+                for (let i = 0; i < winnerIds.length; i += 10) {
+                    chunks.push(winnerIds.slice(i, i + 10));
+                }
+
+                for (const chunk of chunks) {
+                    const q = query(collection(db, 'students'), where(documentId(), 'in', chunk));
+                    const snap = await getDocs(q);
+                    snap.forEach(d => {
+                        studentEmails[d.id] = d.data().email;
+                    });
+                }
+
+                // Send Emails
+                const GAS_URL = 'https://script.google.com/macros/s/AKfycbyC0qE-V93aOFD366Mh2U5-S96yZ0_rR3R25-8f6l4_YkO9k5P8_i9n/exec';
+
+                // We use Promise.all to send in parallel (limit concurrency if needed, but for <50 it stands)
+                const emailPromises = updates.map(async (u) => {
+                    // Find the app data from original array to get date/time details
+                    const app = applications.find(a => a.id === u.id);
+                    const email = studentEmails[app.student_id];
+
+                    if (email && app) {
+                        try {
+                            await fetch(GAS_URL, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'text/plain' },
+                                mode: 'no-cors',
+                                body: JSON.stringify({
+                                    to: email,
+                                    subject: '【重要】臨床実習 初日決定のお知らせ',
+                                    body: `
+<!DOCTYPE html>
+<html>
+<body>
+  <div style="max-width:600px;margin:20px auto;font-family:sans-serif;background:#f8fafc;padding:20px;">
+    <div style="background:#4f46e5;padding:24px;text-align:center;color:white;border-radius:12px 12px 0 0;">
+       <h1>実習初日が決定しました</h1>
+    </div>
+    <div style="background:white;padding:32px;border-radius:0 0 12px 12px;border:1px solid #e2e8f0;">
+       <h2>${app.student_name} 様</h2>
+       <p>抽選の結果、あなたの実習初日が以下の通り決定しました。</p>
+       
+       <div style="background:#f1f5f9;padding:20px;border-radius:12px;margin:24px 0;">
+          <p><strong>日付:</strong> ${app.slot_date}</p>
+          <p><strong>時間:</strong> ${app.slot_start_time} - ${app.slot_end_time}</p>
+          <p><strong>区分:</strong> 臨床実習 ${app.training_type}</p>
+       </div>
+       
+       <p style="font-size:12px;color:#64748b;text-align:center;">当日は遅刻しないように集合してください。</p>
+    </div>
+  </div>
+</body>
+</html>`
+                                })
+                            });
+                        } catch (err) {
+                            console.error("Email send failed for", email, err);
+                        }
+                    }
+                });
+
+                // Do not await strictly if we want UI to be fast, but waiting ensures alert is accurate
+                // However, fetching 50 urls might take time. Let's let it run in bg?
+                // Or better, await it with a UI blocker.
+                // Given the requirement, let's await.
+                await Promise.all(emailPromises);
+            }
+
+            alert(`自動割り当てが完了しました。\n当選: ${updates.length}件\n自動削除: ${deletedCount}件\n\n当選者へ通知メールを送信しました。`);
             loadSlots(); // Reload UI
 
         } catch (e) {

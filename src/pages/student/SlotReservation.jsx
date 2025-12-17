@@ -297,89 +297,98 @@ export default function SlotReservation() {
                 if (GAS_WEBHOOK_URL && student.email) {
                     await fetch(GAS_WEBHOOK_URL, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        mode: 'no-cors',
-                        body: JSON.stringify({
-                            to: student.email,
-                            subject: isLottery ? '【臨床実習】実習抽選申込のお知らせ' : '【臨床実習】実習予約のお知らせ',
-                            body: `
+                        // 2. Email Notification
+                        const isLottery = settings?.lotteryMode;
+                        const GAS_URL = 'https://script.google.com/macros/s/AKfycbyC0qE-V93aOFD366Mh2U5-S96yZ0_rR3R25-8f6l4_YkO9k5P8_i9n/exec';
+
+                        if(!isLottery) {
+                            // Formatting for Single Reservation (Standard Mode)
+                            await fetch(GAS_URL, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'text/plain' }, // no-cors specific
+                                mode: 'no-cors',
+                                body: JSON.stringify({
+                                    to: student.email,
+                                    subject: '【臨床実習】実習予約のお知らせ',
+                                    body: `
 <!DOCTYPE html>
 <html>
-<head>
-<meta name="color-scheme" content="light dark">
-<meta name="supported-color-schemes" content="light dark">
-<style>
-  :root { color-scheme: light dark; supported-color-schemes: light dark; }
-  body { font-family: -apple-system, sans-serif; line-height: 1.6; color: #1e293b; background-color: #f8fafc; margin: 0; padding: 0; }
-  .container { max-width: 600px; margin: 20px auto; padding: 20px; }
-  .card { background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid #e2e8f0; }
-  .header { background-color: #4f46e5; padding: 24px; text-align: center; } /* Indigo for Reservation */
-  .header h1 { color: #ffffff; margin: 0; font-size: 20px; font-weight: 700; }
-  .content { padding: 32px 24px; }
-  .content h2 { color: #0f172a; margin-top: 0; font-size: 18px; text-align: center; margin-bottom: 24px; }
-  .info-box { background-color: #f1f5f9; border-radius: 12px; padding: 20px; margin: 24px 0; border: 1px solid #e2e8f0; }
-  .info-row { display: flex; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 8px; }
-  .info-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-  .label { font-size: 13px; color: #64748b; font-weight: 600; }
-  .value { font-size: 15px; color: #334155; font-weight: 600; text-align: right; }
-  .footer { text-align: center; padding: 24px; color: #94a3b8; font-size: 12px; }
-  
-  @media (prefers-color-scheme: dark) {
-    body { background-color: #0f172a !important; color: #e2e8f0 !important; }
-    .card { background-color: #1e293b !important; border-color: #334155 !important; box-shadow: none !important; }
-    .content h2 { color: #f8fafc !important; }
-    .info-box { background-color: #334155 !important; border-color: #475569 !important; }
-    .label { color: #94a3b8 !important; }
-    .value { color: #f1f5f9 !important; }
-  }
-</style>
-</head>
+<head><meta name="color-scheme" content="light dark"><style>/* ... styles ... */</style></head>
 <body>
-  <div class="container">
-    <div class="card">
-      <div class="header" style="${isLottery ? 'background-color: #f59e0b;' : ''}">
-        <h1>${isLottery ? '抽選申込完了' : '実習予約完了'}</h1>
-      </div>
-      <div class="content">
-        <h2>${student.name} 様</h2>
-        <p>${isLottery ? '以下の内容で抽選への申込を受け付けました。<br><strong>※まだ確定ではありません。後日結果をご連絡します。</strong>' : '以下の内容で実習予約を受け付けました。'}</p>
-        
-        <div class="info-box">
-          <div class="info-row">
-            <span class="label">日付</span>
-            <span class="value">${formatDate(selectedSlot.date).full}</span>
-          </div>
-          <div class="info-row">
-            <span class="label">予約時間</span>
-            <span class="value" style="color: #4f46e5;">${customStartTime} - ${customEndTime}</span>
-          </div>
-          <div class="info-row">
-            <span class="label">実習区分</span>
-            <span class="value">臨床実習 ${selectedSlot.training_type}</span>
-          </div>
-        </div>
-        
-        <p style="text-align: center; font-size: 14px; color: #64748b;">変更・キャンセルはマイページから行えます。<br>当日は遅刻しないようにご注意ください。</p>
-      </div>
+  <div class="container" style="max-width:600px;margin:20px auto;padding:20px;font-family:sans-serif;">
+    <div style="background-color:#4f46e5;padding:24px;text-align:center;color:white;border-radius:16px 16px 0 0;">
+       <h1>実習予約完了</h1>
     </div>
-    <div class="footer">
-      &copy; NSSU Clinical Training System
+    <div style="background-color:#fff;padding:32px;border:1px solid #e2e8f0;border-radius:0 0 16px 16px;">
+       <h2>${student.name} 様</h2>
+       <p>以下の内容で実習予約を受け付けました。</p>
+       <div style="background:#f8fafc;padding:20px;border-radius:12px;margin:24px 0;">
+          <p><strong>日付:</strong> ${formatDate(selectedSlot.date).full}</p>
+          <p><strong>時間:</strong> ${customStartTime} - ${customEndTime}</p>
+          <p><strong>区分:</strong> 臨床実習 ${selectedSlot.training_type}</p>
+       </div>
+       <p style="font-size:12px;color:#64748b;text-align:center;">NSSU Clinical Training System</p>
     </div>
   </div>
 </body>
 </html>`
-                        })
-                    });
+                                })
+                            });
+                        } else {
+                            // Lottery Mode: Check if we have 3 applications
+                            const myAppsQ = query(
+                                collection(db, 'reservations'),
+                                where('student_id', '==', student.id),
+                                where('status', '==', 'applied')
+                            );
+                            const myAppsSnap = await getDocs(myAppsQ);
+
+                            // If the user has exactly 3 applications (1st, 2nd, 3rd), send the consolidated email
+                            if(myAppsSnap.size >= 3) { // >= in case of weird state, but usually 3
+                        const apps = myAppsSnap.docs.map(d => d.data()).sort((a, b) => a.priority - b.priority);
+
+                        const appsListHtml = apps.map(app => `
+                        <div style="background:#fff;padding:15px;margin-bottom:10px;border-radius:8px;border:1px solid #e2e8f0;">
+                            <div style="font-weight:bold;color:#f59e0b;margin-bottom:5px;">第${app.priority}希望</div>
+                            <div>${app.slot_date} ${app.slot_start_time} - ${app.slot_end_time}</div>
+                            <div style="font-size:12px;color:#64748b;">(実習${app.training_type || '?'})</div>
+                        </div>
+                    `).join('');
+
+                        await fetch(GAS_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'text/plain' },
+                            mode: 'no-cors',
+                            body: JSON.stringify({
+                                to: student.email,
+                                subject: '【臨床実習】抽選申込受付完了（第1〜第3希望）',
+                                body: `
+<!DOCTYPE html>
+<html>
+<body>
+  <div style="max-width:600px;margin:20px auto;font-family:sans-serif;background:#f8fafc;padding:20px;">
+    <div style="background:#f59e0b;padding:24px;text-align:center;color:white;border-radius:12px 12px 0 0;">
+       <h1>抽選申込 受付完了</h1>
+    </div>
+    <div style="background:white;padding:32px;border-radius:0 0 12px 12px;border:1px solid #e2e8f0;">
+       <h2>${student.name} 様</h2>
+       <p>第1〜第3希望までの抽選申込を受け付けました。<br><strong>※まだ確定ではありません。後日結果をご連絡します。</strong></p>
+       
+       <div style="background:#f1f5f9;padding:20px;border-radius:12px;margin:20px 0;">
+          ${appsListHtml}
+       </div>
+       
+       <p style="font-size:12px;color:#64748b;text-align:center;">変更・キャンセルはマイページから行えます。</p>
+    </div>
+  </div>
+</body>
+</html>`
+                            })
+                        });
+                    }
                 }
-            } catch (e) {
-                console.error('Email failed', e);
-                // Do not block UI success even if email fails
             }
-
-
-
-            alert(isLottery ? `第${reservationPriority}希望として抽選に申し込みました。\n結果をお待ちください。` : '予約が完了しました');
-            setShowTimeModal(false);
+            } catch (e) {
             setSelectedSlot(null);
 
             // Reload existing reservations for next check
