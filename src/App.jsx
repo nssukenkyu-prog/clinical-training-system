@@ -46,7 +46,8 @@ function App() {
 
       // 2. Check Student
       const studentsRef = collection(db, 'students');
-      const qStudent = query(studentsRef, where('email', '==', currentUser.email));
+      // Use auth_user_id for reliable matching with Shadow Auth
+      const qStudent = query(studentsRef, where('auth_user_id', '==', currentUser.uid));
       const studentSnap = await getDocs(qStudent);
       if (!studentSnap.empty) {
         setUserRole('student');

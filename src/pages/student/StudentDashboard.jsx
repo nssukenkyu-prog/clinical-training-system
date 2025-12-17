@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { db } from '../../lib/firebase';
+import { db, auth } from '../../lib/firebase';
 import { collection, query, where, getDocs, orderBy, updateDoc, doc } from 'firebase/firestore';
 import { Clock, Calendar, CheckCircle2, ChevronRight, Trophy, Activity, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -11,8 +11,20 @@ export default function StudentDashboard() {
 
     useEffect(() => {
         const fetchData = async () => {
-            const studentId = sessionStorage.getItem('clinical_student_id');
-            if (!studentId) return;
+            let foundStudentId = sessionStorage.getItem('clinical_student_id');
+
+            // Fallback: Check Firebase Auth if no session ID
+            if (!foundStudentId && auth.currentUser) {
+                const q = query(collection(db, 'students'), where('auth_user_id', '==', auth.currentUser.uid));
+                const snap = await getDocs(q);
+                if (!snap.empty) {
+                    foundStudentId = snap.docs[0].id;
+                    // Restore session for consistency
+                    sessionStorage.setItem('clinical_student_id', foundStudentId);
+                }
+            }
+
+            if (!foundStudentId) return;
 
             try {
                 // Fetch Student

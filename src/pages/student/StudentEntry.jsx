@@ -70,7 +70,8 @@ export default function StudentEntry() {
             }
 
             // 3. Password: s{ID}-{NormalizedName}
-            const password = `s${studentNumber}-${normalizedName}`;
+            // Use lowercase studentNumber strictly
+            const password = `s${studentNumber.toLowerCase()}-${normalizedName}`;
 
             // 4. Attempt Sign In
             await signInWithEmailAndPassword(auth, shadowEmail, password);

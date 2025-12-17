@@ -27,7 +27,8 @@ export default function SlotReservation() {
 
             // Fallback: Check Firebase Auth if no session ID
             if (!foundStudentId && auth.currentUser) {
-                const q = query(collection(db, 'students'), where('email', '==', auth.currentUser.email));
+                // Use auth_user_id to match the Shadow Auth user to the Student Doc
+                const q = query(collection(db, 'students'), where('auth_user_id', '==', auth.currentUser.uid));
                 const snap = await getDocs(q);
                 if (!snap.empty) {
                     foundStudentId = snap.docs[0].id;
