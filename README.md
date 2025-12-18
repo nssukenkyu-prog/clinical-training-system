@@ -17,18 +17,18 @@
 ## 技術スタック
 
 - **Frontend**: React + Vite
-- **Backend**: Supabase (Auth, PostgreSQL, Edge Functions)
+- **Backend**: Firebase (Auth, Firestore)
 - **Hosting**: Cloudflare Pages
 
 ## セットアップ
 
-1. Supabaseプロジェクト作成
-2. データベースセットアップ（[SUPABASE_SETUP.md](./SUPABASE_SETUP.md)参照）
+1. Firebaseプロジェクト作成
+2. データベースセットアップ（[FIREBASE_SETUP.md](./FIREBASE_SETUP.md)参照）
 3. 環境変数設定
 
 ```bash
 cp .env.example .env
-# .envを編集してSupabaseの設定を追加
+# .envを編集してFirebaseの設定を追加
 ```
 
 4. 依存関係インストール
@@ -46,15 +46,17 @@ npm run dev
 ## 環境変数
 
 ```
-VITE_SUPABASE_URL=https://xxxxx.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJxxxxx...
+VITE_FIREBASE_API_KEY=...
+VITE_FIREBASE_AUTH_DOMAIN=...
+VITE_FIREBASE_PROJECT_ID=...
+...
 ```
 
 ## デプロイ
 
 ```bash
 npm run build
-npx wrangler pages deploy dist --project-name=clinical-training
+npx wrangler pages deploy dist --project-name=nssu-clerkship-2026
 ```
 
 ## 実習区分
