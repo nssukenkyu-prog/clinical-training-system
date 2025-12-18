@@ -26,6 +26,7 @@ export default function StudentManagement() {
     const [visiblePasswords, setVisiblePasswords] = useState(new Set());
     const [resetRegistration, setResetRegistration] = useState(false);
     const [inputPassword, setInputPassword] = useState('');
+    const [defaultBulkPassword, setDefaultBulkPassword] = useState('');
 
     useEffect(() => {
         loadStudents();
@@ -216,8 +217,8 @@ export default function StudentManagement() {
                 const shadowEmail = `${studentNumber.toLowerCase()}@clinical-system.local`;
                 // Generate Pw
                 const normalizedName = name.replace(/\s+/g, '');
-                // Default: s{ID}-{Name} if no password provided
-                const password = csvPassword || `s${studentNumber.toLowerCase()}-${normalizedName}`;
+                // Priority: 1. CSV Password, 2. Default Bulk Password, 3. Generated (ID-Name)
+                const password = csvPassword || defaultBulkPassword || `s${studentNumber.toLowerCase()}-${normalizedName}`;
 
                 let uid = null;
 
@@ -795,8 +796,25 @@ export default function StudentManagement() {
                             </div>
 
                             <div className="mb-6 p-4 rounded-xl bg-blue-50 border border-blue-100 text-blue-700 text-sm">
-                                <strong className="block mb-1">CSV形式:</strong> 学籍番号,メールアドレス,氏名,学年,実習区分<br />
-                                <span className="text-blue-500">例: 24ca000,yamada@example.com,山田太郎,2,I</span>
+                                <strong className="block mb-1">CSV形式:</strong> 学籍番号,メールアドレス,氏名,学年,実習区分,パスワード(任意)<br />
+                                <span className="text-blue-500">例: 24ca000,yamada@example.com,山田太郎,2,I,customPass123</span>
+                            </div>
+
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-slate-700 mb-2">共通パスワード設定（任意）</label>
+                                <div className="flex items-center gap-2">
+                                    <Key className="w-4 h-4 text-slate-400" />
+                                    <input
+                                        type="text"
+                                        className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:border-primary text-slate-900 transition-colors"
+                                        value={defaultBulkPassword}
+                                        onChange={e => setDefaultBulkPassword(e.target.value)}
+                                        placeholder="未指定時に適用するパスワード (例: nssu2026)"
+                                    />
+                                </div>
+                                <p className="text-xs text-slate-500 mt-1 ml-6">
+                                    ※CSV内にパスワードがある場合はそちらが優先されます。どちらも指定がない場合は「s学籍番号-氏名」が初期設定されます。
+                                </p>
                             </div>
 
                             <div className="mb-6">

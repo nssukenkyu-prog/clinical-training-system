@@ -142,6 +142,11 @@ export default function SlotReservation() {
             return slotStartDateTime > twelveHoursLater;
         });
 
+        // 3. Filter by Training Type
+        if (student && student.training_type) {
+            availableSlots = availableSlots.filter(slot => slot.training_type === student.training_type);
+        }
+
         return availableSlots.sort((a, b) => a.start_time.localeCompare(b.start_time));
     };
 
