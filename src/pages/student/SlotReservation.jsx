@@ -292,25 +292,23 @@ export default function SlotReservation() {
             await addDoc(collection(db, 'reservations'), reservationData);
 
             // GAS Sync & Email
+            // GAS Sync & Email
+            // GAS Sync & Email
             try {
                 const GAS_WEBHOOK_URL = import.meta.env.VITE_GAS_EMAIL_WEBHOOK_URL;
                 if (GAS_WEBHOOK_URL && student.email) {
-                    await fetch(GAS_WEBHOOK_URL, {
-                        method: 'POST',
-                        // 2. Email Notification
-                        const isLottery = settings?.lotteryMode;
-                        const GAS_URL = 'https://script.google.com/macros/s/AKfycbyC0qE-V93aOFD366Mh2U5-S96yZ0_rR3R25-8f6l4_YkO9k5P8_i9n/exec';
+                    const GAS_URL = 'https://script.google.com/macros/s/AKfycbyC0qE-V93aOFD366Mh2U5-S96yZ0_rR3R25-8f6l4_YkO9k5P8_i9n/exec';
 
-                        if(!isLottery) {
-                            // Formatting for Single Reservation (Standard Mode)
-                            await fetch(GAS_URL, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'text/plain' }, // no-cors specific
-                                mode: 'no-cors',
-                                body: JSON.stringify({
-                                    to: student.email,
-                                    subject: '【臨床実習】実習予約のお知らせ',
-                                    body: `
+                    if (!isLottery) {
+                        // Formatting for Single Reservation (Standard Mode)
+                        await fetch(GAS_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'text/plain' },
+                            mode: 'no-cors',
+                            body: JSON.stringify({
+                                to: student.email,
+                                subject: '【臨床実習】実習予約のお知らせ',
+                                body: `
 <!DOCTYPE html>
 <html>
 <head><meta name="color-scheme" content="light dark"><style>/* ... styles ... */</style></head>
@@ -332,22 +330,22 @@ export default function SlotReservation() {
   </div>
 </body>
 </html>`
-                                })
-                            });
-                        } else {
-                            // Lottery Mode: Check if we have 3 applications
-                            const myAppsQ = query(
-                                collection(db, 'reservations'),
-                                where('student_id', '==', student.id),
-                                where('status', '==', 'applied')
-                            );
-                            const myAppsSnap = await getDocs(myAppsQ);
+                            })
+                        });
+                    } else {
+                        // Lottery Mode: Check if we have 3 applications
+                        const myAppsQ = query(
+                            collection(db, 'reservations'),
+                            where('student_id', '==', student.id),
+                            where('status', '==', 'applied')
+                        );
+                        const myAppsSnap = await getDocs(myAppsQ);
 
-                            // If the user has exactly 3 applications (1st, 2nd, 3rd), send the consolidated email
-                            if(myAppsSnap.size >= 3) { // >= in case of weird state, but usually 3
-                        const apps = myAppsSnap.docs.map(d => d.data()).sort((a, b) => a.priority - b.priority);
+                        // If the user has exactly 3 applications (1st, 2nd, 3rd), send the consolidated email
+                        if (myAppsSnap.size >= 3) {
+                            const apps = myAppsSnap.docs.map(d => d.data()).sort((a, b) => a.priority - b.priority);
 
-                        const appsListHtml = apps.map(app => `
+                            const appsListHtml = apps.map(app => `
                         <div style="background:#fff;padding:15px;margin-bottom:10px;border-radius:8px;border:1px solid #e2e8f0;">
                             <div style="font-weight:bold;color:#f59e0b;margin-bottom:5px;">第${app.priority}希望</div>
                             <div>${app.slot_date} ${app.slot_start_time} - ${app.slot_end_time}</div>
@@ -355,14 +353,14 @@ export default function SlotReservation() {
                         </div>
                     `).join('');
 
-                        await fetch(GAS_URL, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'text/plain' },
-                            mode: 'no-cors',
-                            body: JSON.stringify({
-                                to: student.email,
-                                subject: '【臨床実習】抽選申込受付完了（第1〜第3希望）',
-                                body: `
+                            await fetch(GAS_URL, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'text/plain' },
+                                mode: 'no-cors',
+                                body: JSON.stringify({
+                                    to: student.email,
+                                    subject: '【臨床実習】抽選申込受付完了（第1〜第3希望）',
+                                    body: `
 <!DOCTYPE html>
 <html>
 <body>
@@ -383,12 +381,19 @@ export default function SlotReservation() {
   </div>
 </body>
 </html>`
-                            })
-                        });
+                                })
+                            });
+                        }
                     }
                 }
-            }
             } catch (e) {
+                console.error('Email failed', e);
+                // Do not block UI success even if email fails
+            }
+
+            // Success UI
+            alert(isLottery ? `第${reservationPriority}希望として抽選に申し込みました。\n結果をお待ちください。` : '予約が完了しました');
+            setShowTimeModal(false);
             setSelectedSlot(null);
 
             // Reload existing reservations for next check
@@ -397,6 +402,7 @@ export default function SlotReservation() {
                 const resSnap = await getDocs(resQuery);
                 setExistingReservations(resSnap.docs.map(d => d.data()));
             }
+
         } catch (error) {
             console.error(error);
             alert('エラーが発生しました');
