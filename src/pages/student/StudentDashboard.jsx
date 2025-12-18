@@ -161,7 +161,7 @@ export default function StudentDashboard() {
 
                     await fetch(GAS_WEBHOOK_URL, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'Content-Type': 'text/plain' },
                         mode: 'no-cors',
                         body: JSON.stringify({
                             to: student.email,
