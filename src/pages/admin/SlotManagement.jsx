@@ -207,6 +207,10 @@ export default function SlotManagement() {
 
     const handleDeleteSlot = async (slotId) => {
         try {
+            // Transactional delete to clean up reservations if any? 
+            // Current logic just deletes slot. Reservations might become orphaned.
+            // Better to delete slot and let reservations be.
+            // However, the original code just deletes the slot doc.
             await deleteDoc(doc(db, 'slots', slotId));
             setSelectedSlot(null); // Close modal
             loadSlots();
@@ -219,7 +223,29 @@ export default function SlotManagement() {
     const handleCancelReservation = async (reservationId, studentName) => {
         if (!window.confirm(`${studentName}の予約を削除しますか？`)) return;
         try {
-            await deleteDoc(doc(db, 'reservations', reservationId));
+            const { runTransaction } = await import('firebase/firestore');
+            await runTransaction(db, async (transaction) => {
+                const resRef = doc(db, 'reservations', reservationId);
+                const resDoc = await transaction.get(resRef);
+                if (!resDoc.exists()) throw new Error("Reservation not found");
+
+                const resData = resDoc.data();
+                const slotRef = doc(db, 'slots', resData.slot_id);
+                const slotDoc = await transaction.get(slotRef);
+
+                // Delete Reservation
+                transaction.delete(resRef);
+
+                // Update Slot Cache if slot exists
+                if (slotDoc.exists()) {
+                    const slotData = slotDoc.data();
+                    const currentCache = slotData.availability_cache || [];
+                    // Remove this reservation from cache
+                    const newCache = currentCache.filter(c => c.reservation_id !== reservationId);
+                    transaction.update(slotRef, { availability_cache: newCache });
+                }
+            });
+
             loadSlots();
             setSelectedSlot(null);
         } catch (error) {
@@ -231,9 +257,42 @@ export default function SlotManagement() {
     const handleApproveReservation = async (reservationId, studentName) => {
         if (!window.confirm(`${studentName}の予約を確定しますか？`)) return;
         try {
-            await updateDoc(doc(db, 'reservations', reservationId), {
-                status: 'confirmed'
+            const { runTransaction } = await import('firebase/firestore');
+            await runTransaction(db, async (transaction) => {
+                const resRef = doc(db, 'reservations', reservationId);
+                const resDoc = await transaction.get(resRef);
+                if (!resDoc.exists()) throw new Error("Reservation not found");
+                const resData = resDoc.data();
+
+                const slotRef = doc(db, 'slots', resData.slot_id);
+                const slotDoc = await transaction.get(slotRef);
+
+                // Update Reservation
+                transaction.update(resRef, { status: 'confirmed' });
+
+                // Update Slot Cache if slot exists
+                if (slotDoc.exists()) {
+                    const slotData = slotDoc.data();
+                    const currentCache = slotData.availability_cache || [];
+                    // Find and update the specific item, or add it if missing (recovery)
+                    const existingIndex = currentCache.findIndex(c => c.reservation_id === reservationId);
+
+                    let newCache = [...currentCache];
+                    if (existingIndex >= 0) {
+                        newCache[existingIndex] = { ...newCache[existingIndex], status: 'confirmed' };
+                    } else {
+                        // Fallback: Add it
+                        newCache.push({
+                            start: resData.custom_start_time || resData.slot_start_time,
+                            end: resData.custom_end_time || resData.slot_end_time,
+                            status: 'confirmed',
+                            reservation_id: reservationId
+                        });
+                    }
+                    transaction.update(slotRef, { availability_cache: newCache });
+                }
             });
+
             loadSlots();
             setSelectedSlot(null);
         } catch (error) {

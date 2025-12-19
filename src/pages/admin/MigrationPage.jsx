@@ -173,6 +173,77 @@ export default function MigrationPage() {
         }
     };
 
+    const rebuildAvailabilityCache = async () => {
+        if (!window.confirm('Rebuild availability cache for ALL slots?')) return;
+        setStatus('processing');
+        addLog('Starting Cache Rebuild...', 'info');
+
+        try {
+            // 1. Fetch ALL Reservations
+            addLog('Fetching all reservations...', 'info');
+            const resSnap = await getDocs(collection(db, 'reservations'));
+            const reservations = resSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+            addLog(`Found ${reservations.length} total reservations.`, 'info');
+
+            // 2. Group by Slot
+            const slotMap = {}; // slotId -> [reservations]
+            reservations.forEach(r => {
+                if (!slotMap[r.slot_id]) slotMap[r.slot_id] = [];
+                slotMap[r.slot_id].push(r);
+            });
+
+            // 3. Update Slots
+            const slotsToUpdate = Object.keys(slotMap);
+            setProgress({ current: 0, total: slotsToUpdate.length, success: 0, fail: 0 });
+
+            // We iterate slots that HAVE reservations. Slots without reservations have empty cache (default) or need clearing?
+            // Ideally we should also clear slots that HAVE a cache but NO reservations now. 
+            // But for now, let's just fix the active ones. 
+            // Ideally: Fetch ALL slots, and for each slot, find matching reservations (or use the map).
+
+            // Let's Fetch ALL Slots to be robust (clearing old cache if reservation deleted)
+            addLog('Fetching all slots...', 'info');
+            const slotsSnap = await getDocs(collection(db, 'slots'));
+            const allSlots = slotsSnap.docs;
+
+            for (let i = 0; i < allSlots.length; i++) {
+                const slotDoc = allSlots[i];
+                const slotId = slotDoc.id;
+                const slotReservations = slotMap[slotId] || []; // List or empty
+
+                // Build Cache
+                const cache = slotReservations
+                    .filter(r => r.status !== 'cancelled')
+                    .map(r => ({
+                        start: r.custom_start_time || r.slot_start_time,
+                        end: r.custom_end_time || r.slot_end_time,
+                        status: r.status,
+                        reservation_id: r.id
+                    }));
+
+                // Update
+                try {
+                    await updateDoc(doc(db, 'slots', slotId), {
+                        availability_cache: cache
+                    });
+                    setProgress(prev => ({ ...prev, success: prev.success + 1, current: i + 1 }));
+                } catch (e) {
+                    console.error(e);
+                    addLog(`Failed to update slot ${slotId}`, 'error');
+                    setProgress(prev => ({ ...prev, fail: prev.fail + 1 }));
+                }
+            }
+
+            addLog('Cache Rebuild Complete.', 'success');
+
+        } catch (e) {
+            console.error(e);
+            addLog(`Fatal Error: ${e.message}`, 'error');
+        } finally {
+            setStatus('completed');
+        }
+    };
+
     return (
         <div className="p-8 max-w-4xl mx-auto space-y-6">
             <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -229,13 +300,21 @@ export default function MigrationPage() {
                     Start Student Migration
                 </button>
 
-                <div className="mt-4 pt-4 border-t border-slate-100">
+                <div className="mt-4 pt-4 border-t border-slate-100 flex gap-4">
                     <button
                         onClick={fixAdminAccount}
-                        className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold transition-colors flex items-center justify-center gap-2 text-sm"
+                        className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold transition-colors flex items-center justify-center gap-2 text-sm"
                     >
                         <ShieldCheck className="w-4 h-4" />
-                        Fix My Admin Account (Required for new rules)
+                        Fix My Admin Account
+                    </button>
+
+                    <button
+                        onClick={rebuildAvailabilityCache}
+                        className="flex-1 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg font-bold transition-colors flex items-center justify-center gap-2 text-sm"
+                    >
+                        <RefreshCw className="w-4 h-4" />
+                        Rebuild Slot Cache
                     </button>
                 </div>
             </div>
