@@ -201,21 +201,22 @@ export default function StudentManagement() {
         setSending(true);
 
         try {
-            // We process one by one to create Auth users serially
-            // Limiting for large batches might be needed, but assuming small operation for now.
             let successCount = 0;
+            const errors = []; // Error tracking
             const batch = writeBatch(db);
             const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
 
-            // Limit batch size? Firestore limit is 500.
             // Loop
-            for (const line of lines) {
-                const [studentNumber, email, name, grade, trainingType, csvPassword] = line.split(',').map(s => s.trim());
-                if (!studentNumber) continue;
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const parts = line.split(',').map(s => s.trim());
+                if (parts.length < 3) continue; // Skip empty/invalid lines
+
+                const [studentNumber, email, name, grade, trainingType, csvPassword] = parts;
+                if (!studentNumber || !email) continue;
 
                 // 1. Auth (Name-Based)
                 const shadowEmail = `${studentNumber.toLowerCase()}@clinical-system.local`;
-                // Generate Pw
                 const normalizedName = name.replace(/\s+/g, '');
                 // Priority: 1. CSV Password, 2. Default Bulk Password, 3. Generated (ID-Name)
                 const password = csvPassword || defaultBulkPassword || `s${studentNumber.toLowerCase()}-${normalizedName}`;
@@ -227,16 +228,16 @@ export default function StudentManagement() {
                     await updateProfile(userCred.user, { displayName: name });
                     uid = userCred.user.uid;
                 } catch (e) {
-                    console.warn(`Auth failed for ${name}:`, e.code);
-                    // For bulk, if auth fails (e.g. email exists), we might skip or continue.
-                    // If we can't get UID, we can't link effectively for strict rules.
-                    // But maybe the user already exists in Auth?
-                    // Let's assume for now we skip DB creation if Auth fails to avoid misalignment.
-                    continue;
+                    // Track Auth errors
+                    console.warn(`Auth failed for ${name} (${studentNumber}):`, e.code);
+                    let msg = e.message;
+                    if (e.code === 'auth/email-already-in-use') msg = '既に登録済みのユーザーです (Auth)';
+                    if (e.code === 'auth/invalid-email') msg = 'メールアドレスの形式が不正です';
+                    errors.push(`行${i + 1} (${studentNumber}): ${msg}`);
+                    continue; // Skip DB creation for this user
                 }
 
                 // 2. DB Refs
-                // Use UID as Doc ID for consistency with Single Add
                 const newDocRef = doc(db, 'students', uid);
 
                 // Private
@@ -267,16 +268,25 @@ export default function StudentManagement() {
                 successCount++;
             }
 
-            await batch.commit();
+            if (successCount > 0) {
+                await batch.commit();
+            }
 
             setShowBulkModal(false);
             setCsvData('');
             loadStudents();
-            alert(`${successCount}名の学生を登録しました\n※各学生へのパスワード通知を忘れずに行ってください。`);
+
+            let message = `${successCount}名の学生を登録しました。`;
+            if (errors.length > 0) {
+                message += `\n\n【登録失敗: ${errors.length}件】\n` + errors.join('\n');
+            } else {
+                message += `\n※各学生へのパスワード通知を忘れずに行ってください。`;
+            }
+            alert(message);
 
         } catch (error) {
             console.error(error);
-            alert('一括登録中にエラーが発生しました');
+            alert('一括登録中に予期せぬエラーが発生しました: ' + error.message);
         } finally {
             setSending(false);
         }
