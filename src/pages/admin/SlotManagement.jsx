@@ -162,7 +162,8 @@ export default function SlotManagement() {
                 end_time: formData.endTime,
                 training_type: formData.trainingType,
                 max_capacity: formData.maxCapacity,
-                is_active: true
+                is_active: true,
+                availability_cache: []
             });
             setShowCreateModal(false);
             loadSlots();
@@ -193,7 +194,8 @@ export default function SlotManagement() {
                     end_time: t.end,
                     training_type: formData.trainingType,
                     max_capacity: formData.maxCapacity,
-                    is_active: true
+                    is_active: true,
+                    availability_cache: []
                 });
             });
             await batch.commit();
