@@ -413,27 +413,27 @@ export default function SlotReservation() {
                             body: JSON.stringify({
                                 to: student.email,
                                 subject: '【臨床実習】実習予約のお知らせ',
-                                body: \`
-\${student?.name || '学生'} 様
+                                body: `
+${student?.name || '学生'} 様
 
-以下の内容で実習（\${isLottery ? '抽選申込' : '予約確定'}）を受け付けました。
+以下の内容で実習（${isLottery ? '抽選申込' : '予約確定'}）を受け付けました。
 
 ■日時
-\${selectedSlot.date} (\${formatDate(selectedSlot.date).weekday})
-\${selectedSlot.start_time.slice(0, 5)} - \${selectedSlot.end_time.slice(0, 5)}
+${selectedSlot.date} (${formatDate(selectedSlot.date).weekday})
+${selectedSlot.start_time.slice(0, 5)} - ${selectedSlot.end_time.slice(0, 5)}
 
 ■実習内容
-実習\${selectedSlot.training_type}
+実習${selectedSlot.training_type}
 
 ■予約詳細
-開始希望: \${customStartTime}
-終了希望: \${customEndTime}
-(\${parseMinutes(customEndTime) - parseMinutes(customStartTime)}分間)
+開始希望: ${customStartTime}
+終了希望: ${customEndTime}
+(${parseMinutes(customEndTime) - parseMinutes(customStartTime)}分間)
 
-\${isLottery ? '※現在は抽選申込受付中です。確定までしばらくお待ちください。' : '※予約は確定しました。当日よろしくお願いいたします。'}
+${isLottery ? '※現在は抽選申込受付中です。確定までしばらくお待ちください。' : '※予約は確定しました。当日よろしくお願いいたします。'}
 
 キャンセルや変更については、システムをご確認ください。
-\`.trim()
+`.trim()
                             })
                         });
                         // NOTE: I will restore the FULL email template in the actual file content to avoid regression, 
@@ -452,7 +452,7 @@ export default function SlotReservation() {
             } catch (e) { console.error(e) }
 
             // Success UI
-            alert(isLottery ? `第${ reservationPriority }希望として抽選に申し込みました。\n結果をお待ちください。` : '予約が完了しました');
+            alert(isLottery ? `第${reservationPriority}希望として抽選に申し込みました。\n結果をお待ちください。` : '予約が完了しました');
             setShowTimeModal(false);
             setSelectedSlot(null);
 
@@ -483,7 +483,7 @@ export default function SlotReservation() {
         return {
             day: date.getDate(),
             weekday: days[date.getDay()],
-            full: `${ date.getMonth() + 1 }月${ date.getDate() }日`
+            full: `${date.getMonth() + 1}月${date.getDate()}日`
         };
     };
 
@@ -535,7 +535,7 @@ export default function SlotReservation() {
                                 <span className="text-xs font-medium mb-1">{dateInfo.weekday}</span>
                                 <span className="text-xl font-bold">{dateInfo.day}</span>
                                 {hasSlots && (
-                                    <div className={`w - 1.5 h - 1.5 rounded - full mt - 1 ${ isSelected? 'bg-indigo-400': 'bg-indigo-500' }`} />
+                                    <div className={`w - 1.5 h - 1.5 rounded - full mt - 1 ${isSelected ? 'bg-indigo-400' : 'bg-indigo-500'}`} />
                                 )}
                             </button>
                         );
@@ -767,7 +767,7 @@ const parseMinutes = (timeStr) => {
 const formatMinutes = (minutes) => {
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
-    return `${ h.toString().padStart(2, '0') }: ${ m.toString().padStart(2, '0') }`;
+    return `${h.toString().padStart(2, '0')}: ${m.toString().padStart(2, '0')}`;
 };
 
 const getValidStartTimes = (slot) => {
