@@ -910,7 +910,11 @@ ${r.slot_start_time} - ${r.slot_end_time}
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <div className="text-xs text-slate-500 font-mono mt-0.5">{r.student_number}</div>
+                                                    <div className="text-xs text-slate-500 font-mono mt-0.5">
+                                                        {r.student_number}
+                                                        <span className="mx-2 text-slate-300">|</span>
+                                                        {(r.custom_start_time || selectedSlot.start_time).slice(0, 5)} - {(r.custom_end_time || selectedSlot.end_time).slice(0, 5)}
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-1">

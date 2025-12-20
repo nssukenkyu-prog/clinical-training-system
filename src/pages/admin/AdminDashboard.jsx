@@ -454,6 +454,9 @@ export default function AdminDashboard() {
                                                         )}
                                                     </div>
                                                     <div className="text-xs text-slate-500 font-mono">{r.students?.student_number}</div>
+                                                    <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                                                        {(r.custom_start_time || selectedSlot.start_time).slice(0, 5)} - {(r.custom_end_time || selectedSlot.end_time).slice(0, 5)}
+                                                    </div>
                                                 </div>
                                             </div>
                                             <span className={clsx(

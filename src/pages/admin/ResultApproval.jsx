@@ -173,7 +173,7 @@ export default function ResultApproval() {
         <div class="info-box">
           <div class="info-row">
             <span class="label">日時</span>
-            <span class="value">${formatDate(reservation.slot.date)}<br>${reservation.slot.start_time.slice(0, 5)} - ${reservation.slot.end_time.slice(0, 5)}</span>
+            <span class="value">${formatDate(reservation.slot.date)}<br>${(reservation.custom_start_time || reservation.slot.start_time).slice(0, 5)} - ${(reservation.custom_end_time || reservation.slot.end_time).slice(0, 5)}</span>
           </div>
           <div class="info-row">
             <span class="label">実習区分</span>
@@ -359,8 +359,8 @@ export default function ResultApproval() {
                 <div className="grid grid-cols-1 gap-4">
                     {reservations.map((reservation) => {
                         const defaultDuration = calculateDuration(
-                            reservation.check_in_time || reservation.slot.start_time,
-                            reservation.check_out_time || reservation.slot.end_time
+                            reservation.check_in_time || reservation.custom_start_time || reservation.slot.start_time,
+                            reservation.check_out_time || reservation.custom_end_time || reservation.slot.end_time
                         );
 
                         return (
@@ -395,7 +395,7 @@ const ResultCard = ({ reservation, defaultDuration, onApprove, onCancel, isProce
                         実習{reservation.slot.training_type}
                     </span>
                     <span className="text-slate-500 text-sm font-medium">
-                        {formatDate(reservation.slot.date)} {reservation.slot.start_time.slice(0, 5)}-{reservation.slot.end_time.slice(0, 5)}
+                        {formatDate(reservation.slot.date)} {(reservation.custom_start_time || reservation.slot.start_time).slice(0, 5)}-{(reservation.custom_end_time || reservation.slot.end_time).slice(0, 5)}
                     </span>
                     {(reservation.check_in_time || reservation.check_out_time) && (
                         <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-mono">
