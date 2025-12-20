@@ -21,17 +21,18 @@ export default function SlotReservation() {
     const [settings, setSettings] = useState(null);
     const dateScrollRef = useRef(null);
 
-    useEffect(() => {
-        const fetchStudentAndSettings = async () => {
+    const fetchStudentAndSettings = async (currentUser) => {
+        try {
             let foundStudentId = sessionStorage.getItem('clinical_student_id');
 
             // Fallback: Check Firebase Auth if no session ID
-            if (!foundStudentId && auth.currentUser) {
+            if (!foundStudentId && currentUser) {
                 // Use auth_user_id to match the Shadow Auth user to the Student Doc
-                const q = query(collection(db, 'students'), where('auth_user_id', '==', auth.currentUser.uid));
+                const q = query(collection(db, 'students'), where('auth_user_id', '==', currentUser.uid));
                 const snap = await getDocs(q);
                 if (!snap.empty) {
                     foundStudentId = snap.docs[0].id;
+                    sessionStorage.setItem('clinical_student_id', foundStudentId);
                 }
             }
 
@@ -55,19 +56,22 @@ export default function SlotReservation() {
             if (!settingsDoc.empty) {
                 setSettings(settingsDoc.docs[0].data().value);
             }
-        };
-
-        // If auth is not ready yet, we might miss it. So we should listen to auth state changes or retry.
-        // For simplicity in this patch, we'll try immediately. 
-        // A better approach is to wrap this in onAuthStateChanged if auth.currentUser is null initially.
-        if (auth.currentUser) {
-            fetchStudentAndSettings();
-        } else {
-            // Wait briefly or just rely on re-render if parent passes user. 
-            // But actually, since this is a page route, App.jsx waits for auth before rendering this.
-            // So auth.currentUser SHOULD be populated.
-            fetchStudentAndSettings();
+        } catch (e) {
+            console.error("Fetch Error:", e);
         }
+    };
+
+    useEffect(() => {
+        // Wait for Auth to be ready before fetching
+        const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                await fetchStudentAndSettings(user);
+            } else {
+                setLoading(false);
+            }
+        });
+
+        return () => unsubscribeAuth();
     }, []);
 
     useEffect(() => {
