@@ -40,9 +40,10 @@ export default function StudentManagement() {
             const studentsSnapshot = await getDocs(qStudents);
             const studentsData = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-            // Fetch all completed reservations to calculate total minutes
+            // Fetch all reservations for stats and detail view
             const reservationsRef = collection(db, 'reservations');
-            const qReservations = query(reservationsRef, where('status', '==', 'completed'));
+            // Remove 'status' filter to get confirmed/applied too
+            const qReservations = query(reservationsRef);
             const reservationsSnapshot = await getDocs(qReservations);
             const reservationsData = reservationsSnapshot.docs.map(doc => doc.data());
 
