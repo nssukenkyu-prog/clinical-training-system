@@ -414,7 +414,7 @@ export default function SlotReservation() {
                 const GAS_WEBHOOK_URL = import.meta.env.VITE_GAS_EMAIL_WEBHOOK_URL;
                 // Original logic restoration for email
                 if (student.email) {
-                    const GAS_URL = 'https://script.google.com/macros/s/AKfycbyC0qE-V93aOFD366Mh2U5-S96yZ0_rR3R25-8f6l4_YkO9k5P8_i9n/exec';
+                    const GAS_URL = GAS_WEBHOOK_URL;
 
 
                     if (!isLottery) {

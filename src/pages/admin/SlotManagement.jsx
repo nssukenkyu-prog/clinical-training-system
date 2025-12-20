@@ -307,7 +307,7 @@ export default function SlotManagement() {
                         const email = s.email;
 
                         if (email) {
-                            const GAS_URL = 'https://script.google.com/macros/s/AKfycbyC0qE-V93aOFD366Mh2U5-S96yZ0_rR3R25-8f6l4_YkO9k5P8_i9n/exec';
+                            const GAS_URL = import.meta.env.VITE_GAS_EMAIL_WEBHOOK_URL;
                             await fetch(GAS_URL, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'text/plain' },
