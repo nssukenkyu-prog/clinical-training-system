@@ -295,6 +295,51 @@ export default function SlotManagement() {
                 }
             });
 
+            // Email Notification Logic
+            try {
+                // Fetch fresh reservation to get details (or just use what we know + student fetch)
+                const resSnap = await getDocs(query(collection(db, 'reservations'), where('__name__', '==', reservationId)));
+                if (!resSnap.empty) {
+                    const r = resSnap.docs[0].data();
+                    const sSnap = await getDocs(query(collection(db, 'students'), where('__name__', '==', r.student_id)));
+                    if (!sSnap.empty) {
+                        const s = sSnap.docs[0].data();
+                        const email = s.email;
+
+                        if (email) {
+                            const GAS_URL = 'https://script.google.com/macros/s/AKfycbyC0qE-V93aOFD366Mh2U5-S96yZ0_rR3R25-8f6l4_YkO9k5P8_i9n/exec';
+                            await fetch(GAS_URL, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'text/plain' },
+                                mode: 'no-cors',
+                                body: JSON.stringify({
+                                    to: email,
+                                    subject: '【臨床実習】実習予約のお知らせ',
+                                    body: `
+${s.name} 様
+
+以下の内容で実習予約が確定しました。
+
+■日時
+${r.slot_date}
+${r.slot_start_time} - ${r.slot_end_time}
+
+■実習内容
+実習${r.slot_training_type}
+
+■予約詳細
+開始希望: ${r.custom_start_time}
+終了希望: ${r.custom_end_time}
+
+※手動承認により確定しました。
+`.trim()
+                                })
+                            });
+                        }
+                    }
+                }
+            } catch (ignore) { console.error(ignore); }
+
             loadSlots();
             setSelectedSlot(null);
         } catch (error) {
@@ -302,6 +347,7 @@ export default function SlotManagement() {
             alert('予約確定に失敗しました');
         }
     };
+
 
     const handleRunLottery = async () => {
         if (!window.confirm('抽選割り当てを実行しますか？\n現在「抽選待ち」の全ての予約に対して、\n希望順位と定員(5名)に基づき自動割り当てを行います。')) return;
