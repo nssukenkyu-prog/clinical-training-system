@@ -259,9 +259,20 @@ export default function SlotReservation() {
         return dayReservations.length === 0;
     };
 
+    const hasAnyReservationOnDate = (dateStr) => {
+        return existingReservations.some(r =>
+            r.slot_date === dateStr && (r.status === 'confirmed' || r.status === 'applied')
+        );
+    };
+
     const checkDailyLimit = (dateStr, newDurationMinutes) => {
         // Just checking strict limit first is safer, but keeping duration check as fallback
         if (!checkStrictDailyLimit(dateStr)) return false;
+
+        // Min/Max Duration Check (User Request: 3h - 5h)
+        if (newDurationMinutes < 180 || newDurationMinutes > 300) {
+            return false;
+        }
 
         const max = settings?.maxDailyMinutes || 480;
         // Sum confirmed AND applied (for lottery self-consistency)
@@ -319,8 +330,14 @@ export default function SlotReservation() {
                     return;
                 }
 
-                // Check Daily Duration Limit
+                // Check Daily Duration Limit (3h - 5h)
                 const duration = parseMinutes(customEndTime) - parseMinutes(customStartTime);
+                if (duration < 180 || duration > 300) {
+                    alert('実習時間は3時間以上、5時間以内で設定してください。');
+                    setReserving(false);
+                    return;
+                }
+
                 if (!checkDailyLimit(selectedSlot.date, duration)) {
                     const maxHours = (settings?.maxDailyMinutes || 480) / 60;
                     alert(`1日の実習可能時間（${maxHours}時間）の上限を超えています。\n他の予約と合わせて上限以内に収めてください。`);
@@ -386,6 +403,14 @@ export default function SlotReservation() {
                     return;
                 }
                 const duration = parseMinutes(customEndTime) - parseMinutes(customStartTime);
+
+                // Duration Check
+                if (duration < 180 || duration > 300) {
+                    alert('実習時間は3時間以上、5時間以内で設定してください。');
+                    setReserving(false);
+                    return;
+                }
+
                 if (!checkDailyLimit(selectedSlot.date, duration)) {
                     const maxHours = (settings?.maxDailyMinutes || 480) / 60;
                     alert(`1日の実習可能時間（${maxHours}時間）の上限を超えています。`);
@@ -453,27 +478,46 @@ export default function SlotReservation() {
                             body: JSON.stringify({
                                 to: student.email,
                                 subject: '【臨床実習】実習予約のお知らせ',
-                                body: `
-${student?.name || '学生'} 様
+                                htmlBody: `
+<!DOCTYPE html>
+<html>
+<body style="font-family: sans-serif; line-height: 1.6; color: #333;">
+  <div style="max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+    <div style="background-color: #4f46e5; padding: 20px; text-align: center; color: white;">
+      <h2 style="margin: 0; font-size: 18px;">実習予約完了のお知らせ</h2>
+    </div>
+    <div style="padding: 24px; background-color: #ffffff;">
+      <p>${student?.name || '学生'} 様</p>
+      <p>以下の内容で実習（${isLottery ? '抽選申込' : '予約確定'}）を受け付けました。</p>
+      
+      <div style="background-color: #f8fafc; border-radius: 8px; padding: 16px; margin: 24px 0;">
+        <h3 style="margin-top: 0; font-size: 16px; color: #4f46e5;">日時</h3>
+        <p style="margin: 4px 0; font-weight: bold;">
+          ${selectedSlot.date} (${formatDate(selectedSlot.date).weekday})<br>
+          ${selectedSlot.start_time.slice(0, 5)} - ${selectedSlot.end_time.slice(0, 5)}
+        </p>
 
-以下の内容で実習（${isLottery ? '抽選申込' : '予約確定'}）を受け付けました。
+        <h3 style="margin-top: 16px; font-size: 16px; color: #4f46e5;">実習内容</h3>
+        <p style="margin: 4px 0;">実習${selectedSlot.training_type}</p>
 
-■日時
-${selectedSlot.date} (${formatDate(selectedSlot.date).weekday})
-${selectedSlot.start_time.slice(0, 5)} - ${selectedSlot.end_time.slice(0, 5)}
+        <h3 style="margin-top: 16px; font-size: 16px; color: #4f46e5;">予約詳細</h3>
+        <p style="margin: 4px 0;">
+          開始: <strong>${customStartTime}</strong><br>
+          終了: <strong>${customEndTime}</strong><br>
+          <span style="font-size: 0.9em; color: #64748b;">(${parseMinutes(customEndTime) - parseMinutes(customStartTime)}分間)</span>
+        </p>
+      </div>
 
-■実習内容
-実習${selectedSlot.training_type}
-
-■予約詳細
-開始希望: ${customStartTime}
-終了希望: ${customEndTime}
-(${parseMinutes(customEndTime) - parseMinutes(customStartTime)}分間)
-
-${isLottery ? '※現在は抽選申込受付中です。確定までしばらくお待ちください。' : '※予約は確定しました。当日よろしくお願いいたします。'}
-
-キャンセルや変更については、システムをご確認ください。
-`.trim()
+      <p style="font-size: 14px; color: #64748b;">
+        ${isLottery ? '※現在は抽選申込受付中です。確定連絡をお待ちください。' : '※予約は確定しました。当日は遅刻のないように集合してください。'}
+      </p>
+      <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;">
+      <p style="font-size: 12px; color: #94a3b8; text-align: center;">このメールは自動送信されています。</p>
+    </div>
+  </div>
+</body>
+</html>
+`
                             })
                         });
                         // NOTE: I will restore the FULL email template in the actual file content to avoid regression, 
@@ -605,7 +649,10 @@ ${isLottery ? '※現在は抽選申込受付中です。確定までしばら�
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {selectedDateSlots.map((slot, i) => {
                                 const availability = getAvailability(slot);
+                                // Is this specific slot reserved?
                                 const reserved = isAlreadyReserved(slot);
+                                // Does the student have ANY reservation on this day (other than this one if logic permitted re-booking, but 1-per-day means blocked)?
+                                const dayBlocked = hasAnyReservationOnDate(slot.date) && !reserved;
 
                                 return (
                                     <motion.div
@@ -617,7 +664,9 @@ ${isLottery ? '※現在は抽選申込受付中です。確定までしばら�
                                             "relative overflow-hidden p-6 rounded-3xl border-2 transition-all active:scale-[0.98]",
                                             reserved
                                                 ? "bg-indigo-50 border-indigo-200"
-                                                : "bg-white border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-100"
+                                                : dayBlocked
+                                                    ? "bg-slate-50 border-slate-100 opacity-60 grayscale" // Visual style for blocked day
+                                                    : "bg-white border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-100"
                                         )}
                                     >
                                         <div className="flex justify-between items-start mb-4">
@@ -649,6 +698,10 @@ ${isLottery ? '※現在は抽選申込受付中です。確定までしばら�
                                                 onClick={() => alert('キャンセルは詳細画面から行ってください')}
                                             >
                                                 予約済み
+                                            </button>
+                                        ) : dayBlocked ? (
+                                            <button disabled className="w-full py-3 rounded-xl bg-slate-100 text-slate-400 font-bold text-sm cursor-not-allowed">
+                                                同日予約済み
                                             </button>
                                         ) : (
                                             <button
