@@ -292,77 +292,93 @@ export default function AdminDashboard() {
                             })}
                         </div>
 
-                        {/* Slots */}
-                        {todaySlots.length === 0 ? (
+                        {/* Reservations Graph */}
+                        {todaySlots.flatMap(s => s.reservations || []).length === 0 ? (
                             <div className="absolute inset-0 flex items-center justify-center text-slate-400">
-                                <p>今日の実習枠はありません</p>
+                                <p>今日の予約はありません</p>
                             </div>
                         ) : (
                             <div className="absolute top-0 left-12 right-2 h-full">
-                                {todaySlots.map(slot => {
-                                    // Calculate Position
-                                    const [startH, startM] = slot.start_time.split(':').map(Number);
-                                    const [endH, endM] = slot.end_time.split(':').map(Number);
-                                    const startMin = (startH - 8) * 60 + startM;
-                                    const durationMin = (endH * 60 + endM) - (startH * 60 + startM);
+                                {(() => {
+                                    // Flatten and Sort Reservations
+                                    const allReservations = todaySlots.flatMap(s => s.reservations || [])
+                                        .sort((a, b) => {
+                                            const timeA = (a.custom_start_time || a.slot_start_time || '00:00');
+                                            const timeB = (b.custom_start_time || b.slot_start_time || '00:00');
+                                            return timeA.localeCompare(timeB);
+                                        });
 
-                                    const top = startMin * (100 / 60);
-                                    const height = durationMin * (100 / 60);
+                                    // Simple column assignment for overlapping events
+                                    const processed = [];
+                                    const columns = []; // Array of end times for each column
 
-                                    const confirmedCount = (slot.reservations || []).length;
-                                    const isFull = confirmedCount >= slot.max_capacity;
+                                    allReservations.forEach(r => {
+                                        const startStr = r.custom_start_time || r.slot_start_time || '00:00';
+                                        const endStr = r.custom_end_time || r.slot_end_time || '00:00';
 
-                                    return (
-                                        <button
-                                            key={slot.id}
-                                            onClick={() => handleSlotClick(slot)}
-                                            style={{ top: `${top}px`, height: `${height}px` }}
-                                            className={clsx(
-                                                "absolute w-full rounded-lg border p-3 text-left transition-all hover:shadow-md hover:scale-[1.01] hover:z-10 bg-opacity-95 backdrop-blur-sm group",
-                                                slot.training_type === 'I' ? 'bg-blue-50 border-blue-200 text-blue-900' :
-                                                    slot.training_type === 'II' ? 'bg-emerald-50 border-emerald-200 text-emerald-900' :
-                                                        'bg-purple-50 border-purple-200 text-purple-900'
-                                            )}
-                                        >
-                                            <div className="flex justify-between items-start h-full">
-                                                <div className="flex flex-col justify-between h-full">
-                                                    <div>
-                                                        <div className="text-xs font-bold opacity-70 mb-0.5">
-                                                            {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
-                                                        </div>
-                                                        <div className="font-bold text-base">
-                                                            {getTrainingTypeLabel(slot.training_type)}
-                                                        </div>
-                                                    </div>
+                                        const [sH, sM] = startStr.split(':').map(Number);
+                                        const [eH, eM] = endStr.split(':').map(Number);
+                                        const startTime = sH * 60 + sM;
+                                        const endTime = eH * 60 + eM;
+
+                                        // Find first column that is free
+                                        let colIndex = columns.findIndex(colEnd => colEnd <= startTime);
+                                        if (colIndex === -1) {
+                                            colIndex = columns.length;
+                                            columns.push(endTime);
+                                        } else {
+                                            columns[colIndex] = endTime;
+                                        }
+
+                                        processed.push({ ...r, colIndex, startTime, endTime });
+                                    });
+
+                                    return processed.map(r => {
+                                        // Calculate Position
+                                        const startMin = (r.startTime - 8 * 60); // Offset from 8:00
+                                        const durationMin = r.endTime - r.startTime;
+
+                                        const top = startMin * (100 / 60);
+                                        const height = durationMin * (100 / 60);
+
+                                        // Dynamic Width/Left based on columns
+                                        // Max columns to fit? 
+                                        // Let's assume max 5 columns, width 18% each, gap 1%
+                                        // If many columns, shrink width
+                                        const totalCols = Math.max(columns.length, 1);
+                                        const widthPercent = Math.min(100 / totalCols - 1, 90);
+                                        const leftPercent = r.colIndex * (100 / totalCols);
+
+                                        return (
+                                            <div
+                                                key={r.id}
+                                                style={{
+                                                    top: `${top}px`,
+                                                    height: `${height}px`,
+                                                    left: `${leftPercent}%`,
+                                                    width: `${widthPercent}%`
+                                                }}
+                                                className={clsx(
+                                                    "absolute rounded-lg border p-2 text-left transition-all hover:shadow-md hover:z-20 bg-opacity-90 backdrop-blur-sm overflow-hidden flex flex-col justify-center",
+                                                    r.slot_training_type === 'I' ? 'bg-blue-100/90 border-blue-200 text-blue-900' :
+                                                        r.slot_training_type === 'II' ? 'bg-emerald-100/90 border-emerald-200 text-emerald-900' :
+                                                            'bg-purple-100/90 border-purple-200 text-purple-900'
+                                                )}
+                                                title={`${r.students?.name} (${r.students?.student_number})`}
+                                            >
+                                                <div className="font-bold text-xs truncate leading-tight">
+                                                    {r.students?.name || '不明な学生'}
                                                 </div>
-
-                                                <div className="flex flex-col items-end gap-2">
-                                                    <span className={clsx(
-                                                        "text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1 border",
-                                                        isFull ? "bg-rose-100 text-rose-700 border-rose-200" : "bg-white/60 text-slate-600 border-slate-200"
-                                                    )}>
-                                                        <Users className="w-3 h-3" />
-                                                        {confirmedCount} / {slot.max_capacity}
-                                                    </span>
-
-                                                    {/* Student Avatars Preview */}
-                                                    <div className="flex -space-x-2 overflow-hidden">
-                                                        {(slot.reservations || []).slice(0, 5).map((r, i) => (
-                                                            <div key={i} className="inline-block h-6 w-6 rounded-full ring-2 ring-white bg-white flex items-center justify-center text-[10px] font-bold text-slate-600 shadow-sm" title={r.students?.name}>
-                                                                {r.students?.name?.[0] || '?'}
-                                                            </div>
-                                                        ))}
-                                                        {(slot.reservations || []).length > 5 && (
-                                                            <div className="inline-block h-6 w-6 rounded-full ring-2 ring-white bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500">
-                                                                +{confirmedCount - 5}
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                                <div className="text-[10px] opacity-80 font-mono truncate">
+                                                    {(r.custom_start_time || r.slot_start_time).slice(0, 5)} - {(r.custom_end_time || r.slot_end_time).slice(0, 5)}
+                                                </div>
+                                                <div className="text-[9px] font-bold opacity-70 mt-0.5">
+                                                    実習{r.slot_training_type}
                                                 </div>
                                             </div>
-                                        </button>
-                                    );
-                                })}
+                                        );
+                                    });
+                                })()}
                             </div>
                         )}
 

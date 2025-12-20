@@ -790,7 +790,7 @@ ${r.slot_start_time} - ${r.slot_end_time}
                                                 <div className="w-full flex justify-between items-end">
                                                     <div className="flex items-center gap-1 text-xs font-medium bg-white/50 px-1.5 py-0.5 rounded">
                                                         <Users className="w-3 h-3" />
-                                                        {confirmed}/{slot.max_capacity}
+                                                        {confirmed}
                                                     </div>
                                                 </div>
                                             </div>
@@ -869,7 +869,7 @@ ${r.slot_start_time} - ${r.slot_end_time}
                             <div className="flex items-center justify-between mb-6">
                                 <h4 className="font-bold text-slate-900 flex items-center gap-2">
                                     <Users className="w-5 h-5 text-primary" />
-                                    予約状況 ({selectedSlot.reservations.length} / {selectedSlot.max_capacity})
+                                    予約状況 ({selectedSlot.reservations.length}件)
                                 </h4>
                                 {selectedSlot.reservations.length === 0 && (
                                     <button
@@ -940,13 +940,6 @@ ${r.slot_start_time} - ${r.slot_end_time}
                                 </div>
                             )}
 
-                            {/* Warning if capacity full */}
-                            {selectedSlot.reservations.length >= selectedSlot.max_capacity && (
-                                <div className="mt-4 flex items-center gap-2 text-xs text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-100">
-                                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                                    <span>定員に達しています。これ以上の予約はできません。</span>
-                                </div>
-                            )}
                         </div>
                     </div>
                 </div>
