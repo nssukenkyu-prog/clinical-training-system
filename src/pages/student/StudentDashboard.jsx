@@ -40,12 +40,27 @@ export default function StudentDashboard() {
                 const reservationsRef = collection(db, 'reservations');
                 const qReservations = query(
                     reservationsRef,
-                    where('student_id', '==', foundStudentId),
-                    orderBy('slot_date', 'desc'),
-                    orderBy('slot_start_time', 'asc')
+                    where('student_id', '==', foundStudentId)
                 );
                 const reservationsSnap = await getDocs(qReservations);
-                const reservationsData = reservationsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                let reservationsData = reservationsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                // 1. Filter: Remove "Lost" Lottery Applications (Applied but date passed)
+                //    Also consider if we should hide Cancelled? User didn't ask to hide cancelled, only lost lottery.
+                const todayStr = new Date().toISOString().split('T')[0];
+                reservationsData = reservationsData.filter(r => {
+                    const isLostLottery = r.status === 'applied' && r.slot_date < todayStr;
+                    return !isLostLottery;
+                });
+
+                // 2. Sort: By Created At (Newest First) as requested
+                //    Fallback to slot_date if created_at is missing
+                reservationsData.sort((a, b) => {
+                    const dateA = a.created_at || a.slot_date || '';
+                    const dateB = b.created_at || b.slot_date || '';
+                    return dateB.localeCompare(dateA);
+                });
+
                 setReservations(reservationsData);
 
             } catch (error) {
