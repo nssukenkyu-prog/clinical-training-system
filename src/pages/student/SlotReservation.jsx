@@ -155,6 +155,18 @@ export default function SlotReservation() {
         return slot.reservations.some(r => r.student_id === student.id && r.status !== 'cancelled');
     };
 
+    const handleReserve = (slot) => {
+        setSelectedSlot(slot);
+        setCustomStartTime(slot.start_time);
+        const validEnds = getValidEndTimes(slot.start_time, slot.end_time);
+        if (validEnds.length > 0) {
+            setCustomEndTime(validEnds[0]);
+        } else {
+            setCustomEndTime('');
+        }
+        setShowTimeModal(true);
+    };
+
     const parseMinutes = (timeStr) => {
         const [h, m] = timeStr.split(':').map(Number);
         return h * 60 + m;
