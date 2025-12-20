@@ -395,7 +395,7 @@ export default function StudentDashboard() {
                                         <Clock className="w-4 h-4" />
                                         {nextReservation.custom_start_time.slice(0, 5)} - {nextReservation.custom_end_time.slice(0, 5)}
                                     </div>
-                                    {nextReservation.priority && (
+                                    {nextReservation.priority && nextReservation.status === 'applied' && (
                                         <div className="mt-2 inline-block px-2 py-0.5 rounded border border-orange-200 bg-orange-50 text-orange-700 text-xs font-bold">
                                             第{nextReservation.priority}希望で申込中
                                         </div>
