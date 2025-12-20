@@ -912,7 +912,7 @@ export default function StudentManagement() {
                                                 <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-100">
                                                     <div>
                                                         <div className="font-bold text-slate-700 text-sm">
-                                                            {r.slot_date} {r.slot_start_time.slice(0, 5)}-{r.slot_end_time.slice(0, 5)}
+                                                            {r.slot_date} {(r.custom_start_time || r.slot_start_time).slice(0, 5)}-{(r.custom_end_time || r.slot_end_time).slice(0, 5)}
                                                         </div>
                                                         <div className="text-xs text-slate-500">
                                                             実習{r.slot_training_type}
@@ -921,9 +921,11 @@ export default function StudentManagement() {
                                                     <div className="flex flex-col items-end gap-1">
                                                         <span className={clsx(
                                                             "text-[10px] px-2 py-0.5 rounded-full font-bold",
-                                                            r.status === 'completed' ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"
+                                                            r.status === 'completed' ? "bg-emerald-100 text-emerald-700" :
+                                                                r.status === 'cancelled' ? "bg-rose-100 text-rose-700" :
+                                                                    "bg-blue-100 text-blue-700"
                                                         )}>
-                                                            {r.status === 'completed' ? '承認済' : '予約中'}
+                                                            {r.status === 'completed' ? '承認済' : r.status === 'cancelled' ? 'キャンセル' : '予約中'}
                                                         </span>
                                                         {(r.check_in_time || r.check_out_time) && (
                                                             <div className="text-[10px] text-slate-400 font-mono">

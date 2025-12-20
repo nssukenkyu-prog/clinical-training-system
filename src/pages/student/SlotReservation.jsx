@@ -251,7 +251,18 @@ export default function SlotReservation() {
         return existingReservations.some(r => r.status === 'applied' && r.priority === p);
     };
 
+    const checkStrictDailyLimit = (dateStr) => {
+        // Check if ANY reservation exists for this day (confirmed or applied)
+        const dayReservations = existingReservations.filter(r =>
+            r.slot_date === dateStr && (r.status === 'confirmed' || r.status === 'applied')
+        );
+        return dayReservations.length === 0;
+    };
+
     const checkDailyLimit = (dateStr, newDurationMinutes) => {
+        // Just checking strict limit first is safer, but keeping duration check as fallback
+        if (!checkStrictDailyLimit(dateStr)) return false;
+
         const max = settings?.maxDailyMinutes || 480;
         // Sum confirmed AND applied (for lottery self-consistency)
         const dayReservations = existingReservations.filter(r =>
@@ -301,7 +312,14 @@ export default function SlotReservation() {
                     return;
                 }
 
-                // Check Daily Limit
+                // Check Strict Daily Count Limit (1 per day)
+                if (!checkStrictDailyLimit(selectedSlot.date)) {
+                    alert('1日につき1回までしか予約できません。');
+                    setReserving(false);
+                    return;
+                }
+
+                // Check Daily Duration Limit
                 const duration = parseMinutes(customEndTime) - parseMinutes(customStartTime);
                 if (!checkDailyLimit(selectedSlot.date, duration)) {
                     const maxHours = (settings?.maxDailyMinutes || 480) / 60;
@@ -356,6 +374,12 @@ export default function SlotReservation() {
                 const { runTransaction } = await import('firebase/firestore');
 
                 // Pre-check Client Side (Optional but good UX)
+                if (!checkStrictDailyLimit(selectedSlot.date)) {
+                    alert('1日につき1回までしか予約できません。');
+                    setReserving(false);
+                    return;
+                }
+
                 if (checkOverlap(selectedSlot.date, customStartTime, customEndTime)) {
                     alert('他の予約と時間が重複しています');
                     setReserving(false);
@@ -607,9 +631,6 @@ ${isLottery ? '※現在は抽選申込受付中です。確定までしばら�
                                                     )}>
                                                         実習{slot.training_type}
                                                     </span>
-                                                    <span className={clsx("px-2.5 py-1 rounded-lg text-xs font-bold", availability.color)}>
-                                                        {availability.label}
-                                                    </span>
                                                 </div>
                                                 <div className="text-2xl font-bold text-slate-900">
                                                     {slot.start_time.slice(0, 5)} <span className="text-slate-300 text-lg">-</span> {slot.end_time.slice(0, 5)}
@@ -625,11 +646,11 @@ ${isLottery ? '※現在は抽選申込受付中です。確定までしばら�
                                         {reserved ? (
                                             <button
                                                 className="w-full py-3 rounded-xl bg-white border border-indigo-200 text-indigo-600 font-bold text-sm hover:bg-indigo-50 transition-colors"
-                                                onClick={() => alert('キャンセルは詳細画面から行ってください')} // Simplified for redesign demo
+                                                onClick={() => alert('キャンセルは詳細画面から行ってください')}
                                             >
                                                 予約済み
                                             </button>
-                                        ) : availability.remaining > 0 ? (
+                                        ) : (
                                             <button
                                                 onClick={() => handleReserve(slot)}
                                                 className={clsx(
@@ -640,10 +661,6 @@ ${isLottery ? '※現在は抽選申込受付中です。確定までしばら�
                                                 )}
                                             >
                                                 {settings?.lotteryMode ? '抽選に申し込む' : '予約する'}
-                                            </button>
-                                        ) : (
-                                            <button disabled className="w-full py-3 rounded-xl bg-slate-100 text-slate-400 font-bold text-sm cursor-not-allowed">
-                                                満員
                                             </button>
                                         )}
                                     </motion.div>
